@@ -1,110 +1,152 @@
-# MCP Server for Order Management — คู่มือการใช้งาน
+# Server Guide - Order Management MCP Server
 
-## ภาพรวม
+## Dependencies (requirements.txt)
 
-`server.py` เป็น MCP Server (Model Context Protocol) ที่ให้ AI เช่น Claude เรียกใช้เครื่องมือจัดการคำสั่งซื้อได้ 2 ตัว ผ่าน stdio transport
+| Package | Version | Description |
+|---------|---------|-------------|
+| `mcp[cli]` | >= 1.0.0 | Model Context Protocol SDK พร้อม CLI สำหรับสร้าง MCP Server |
+| `pydantic` | >= 2.0.0 | Data validation และ structured output |
 
----
-
-## Tools ที่มี
-
-### 1. `create_order` — สร้างคำสั่งซื้อ
-
-| Parameter        | Type   | Required | Description                                              |
-| ---------------- | ------ | -------- | -------------------------------------------------------- |
-| `name`           | string | Yes      | ชื่อลูกค้า                                               |
-| `tel`            | string | Yes      | เบอร์โทรศัพท์                                            |
-| `address`        | string | Yes      | ที่อยู่จัดส่ง                                             |
-| `payment_method` | string | Yes      | วิธีชำระเงิน (`credit_card`, `cash_on_delivery`, `bank_transfer`) |
-
-**ผลลัพธ์:** `OrderResult` — มี `success`, `order_id` (เช่น `ORD-A1B2C3D4`), `message`
-
-### 2. `verify_address` — ตรวจสอบความครบถ้วนของที่อยู่
-
-| Parameter   | Type           | Required | Description    |
-| ----------- | -------------- | -------- | -------------- |
-| `name`      | string \| null | No       | ชื่อลูกค้า     |
-| `tel`       | string \| null | No       | เบอร์โทรศัพท์  |
-| `provinces` | string \| null | No       | จังหวัด        |
-| `postcode`  | string \| null | No       | รหัสไปรษณีย์   |
-
-**ผลลัพธ์:** `AddressVerificationResult` — มี `is_valid`, `missing_fields`, `message`
-
----
-
-## วิธีรัน Server
+## การติดตั้ง
 
 ```bash
-# รันตรง
+# สร้าง virtual environment (แนะนำ)
+python -m venv venv
+
+# เปิดใช้งาน virtual environment
+# Windows
+venv\Scripts\activate
+# macOS/Linux
+source venv/bin/activate
+
+# ติดตั้ง dependencies
+pip install -r requirements.txt
+```
+
+หรือใช้ `uv` (เร็วกว่า):
+
+```bash
+uv pip install -r requirements.txt
+```
+
+## การรัน Server
+
+```bash
+# ผ่าน Python โดยตรง
 python server.py
 
 # หรือผ่าน uv
 uv run server.py
 ```
 
-Server ทำงานแบบ **stdio transport** (รับ-ส่งข้อมูลผ่าน stdin/stdout)
+Server จะเริ่มทำงานด้วย transport แบบ `streamable-http` (default port: `8000`, endpoint: `/mcp`)
 
 ---
 
-## การเชื่อมต่อกับ AI Client
+## การทดสอบด้วย MCP Inspector
 
-### Claude Code — ตั้งค่าใน `.mcp.json`
+[MCP Inspector](https://github.com/modelcontextprotocol/inspector) เป็น Web UI สำหรับทดสอบและ debug MCP Server โดยไม่ต้องเขียน client code
 
-```json
-{
-  "mcpServers": {
-    "order-management": {
-      "command": "python",
-      "args": ["server.py"],
-      "cwd": "C:\\Users\\boatr\\MyBoat\\RealFactory\\ProjectRealFactory\\AI-Workshop"
-    }
-  }
-}
+### Prerequisites
+
+- **Node.js** >= 18 (แนะนำ 22.x)
+- ไม่ต้องติดตั้งแยก — ใช้ `npx` รันได้เลย
+
+### ขั้นตอนการใช้งาน
+
+#### 1. เริ่ม server ก่อน
+
+เปิด terminal แรกแล้วรัน server:
+
+```bash
+python server.py
 ```
 
-### Claude Desktop — ตั้งค่าใน `claude_desktop_config.json`
+Server จะรอรับ request ที่ `http://localhost:8000/mcp`
 
-```json
-{
-  "mcpServers": {
-    "order-management": {
-      "command": "python",
-      "args": ["C:\\Users\\boatr\\MyBoat\\RealFactory\\ProjectRealFactory\\AI-Workshop\\server.py"]
-    }
-  }
-}
+#### 2. เปิด MCP Inspector
+
+เปิด terminal ที่สองแล้วรัน:
+
+```bash
+npx @modelcontextprotocol/inspector
 ```
+
+Inspector จะเปิด Web UI ที่ **http://localhost:6274** ในเบราว์เซอร์อัตโนมัติ
+
+#### 3. เชื่อมต่อกับ server
+
+1. ที่หน้า Inspector เปลี่ยน **Transport Type** เป็น `Streamable HTTP`
+2. ใส่ URL: `http://localhost:8000/mcp`
+3. กดปุ่ม **Connect**
+
+#### 4. ทดสอบ Tools
+
+1. คลิกแท็บ **Tools** ด้านบน
+2. คลิก **List Tools** — จะเห็น `create_order` และ `verify_address`
+3. คลิกเลือก tool ที่ต้องการทดสอบ
+4. กรอกค่า parameter ในฟอร์มด้านขวา
+5. กดปุ่ม **Run Tool** เพื่อดูผลลัพธ์
+
+### ตัวอย่างการทดสอบ
+
+**ทดสอบ `create_order`:**
+
+| Field | ตัวอย่างค่า |
+|-------|------------|
+| name | `สมชาย ใจดี` |
+| tel | `0812345678` |
+| address | `123 ถ.สุขุมวิท กรุงเทพฯ 10110` |
+| payment_method | `cash_on_delivery` |
+
+**ทดสอบ `verify_address`:**
+
+| Field | ตัวอย่างค่า |
+|-------|------------|
+| name | `สมชาย ใจดี` |
+| tel | `0812345678` |
+| provinces | `กรุงเทพมหานคร` |
+| postcode | `10110` |
+
+### เปลี่ยน Port (ถ้าจำเป็น)
+
+หาก port default ชนกับ service อื่น:
+
+```bash
+# เปลี่ยน port ของ Inspector UI และ proxy
+CLIENT_PORT=8080 SERVER_PORT=9000 npx @modelcontextprotocol/inspector
+```
+
+### Troubleshooting
+
+| ปัญหา | วิธีแก้ |
+|--------|--------|
+| Inspector ขึ้น "Connection Error" | ตรวจสอบว่า `server.py` กำลังรันอยู่ และ URL ถูกต้อง |
+| Port 6274 หรือ 6277 ถูกใช้งาน | ใช้ `CLIENT_PORT` / `SERVER_PORT` เปลี่ยน port |
+| Port 8000 ถูกใช้งาน | ปิด process อื่นที่ใช้ port 8000 หรือแก้ port ใน server.py |
 
 ---
 
-## Flow การทำงาน
+## Tools ที่มีใน Server
 
-```
-ผู้ใช้พิมพ์: "สั่งซื้อสินค้า ชื่อ สมชาย เบอร์ 0812345678"
-        │
-        ▼
-   AI (Claude) รับข้อความ
-        │
-        ├─► เรียก verify_address(name="สมชาย", tel="0812345678")
-        │   └─► ผลลัพธ์: ขาด provinces, postcode → ถามผู้ใช้เพิ่ม
-        │
-        ▼
-   ผู้ใช้ให้ข้อมูลครบ
-        │
-        ├─► เรียก create_order(name="สมชาย", tel="0812345678",
-        │       address="...", payment_method="cash_on_delivery")
-        │   └─► ผลลัพธ์: ORD-A1B2C3D4 สร้างสำเร็จ
-        │
-        ▼
-   AI ตอบกลับผู้ใช้: "สั่งซื้อเรียบร้อย เลขที่ ORD-A1B2C3D4"
-```
+### 1. `create_order` - สร้างคำสั่งซื้อ
 
----
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `name` | `str` | ชื่อลูกค้า |
+| `tel` | `str` | เบอร์โทรศัพท์ |
+| `address` | `str` | ที่อยู่จัดส่ง |
+| `payment_method` | `str` | วิธีชำระเงิน (credit_card, cash_on_delivery, bank_transfer) |
 
-## ข้อควรรู้
+**Return:** `OrderResult` - มี `success`, `order_id`, `message`
 
-- **ข้อมูลเก็บใน memory เท่านั้น** — ปิด server แล้วข้อมูลจะหายไป หากใช้งานจริงต้องเชื่อมต่อ database
-- **Dependencies** — ต้องติดตั้งก่อนรัน:
-  ```bash
-  pip install "mcp[cli]" pydantic
-  ```
+### 2. `verify_address` - ตรวจสอบที่อยู่
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `name` | `str \| None` | ชื่อลูกค้า |
+| `tel` | `str \| None` | เบอร์โทรศัพท์ |
+| `provinces` | `str \| None` | จังหวัด |
+| `postcode` | `str \| None` | รหัสไปรษณีย์ |
+
+**Return:** `AddressVerificationResult` - มี `is_valid`, `missing_fields`, `message`

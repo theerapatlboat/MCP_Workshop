@@ -18,6 +18,8 @@ from mcp.server.fastmcp import FastMCP
 # Create MCP server
 mcp = FastMCP("Order Management")
 
+OPENAI_API_KEY = "REDACTED_OPENAI_API_KEY"
+
 # In-memory storage for orders (in production, use a database)
 orders: list[dict] = []
 
