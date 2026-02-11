@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "order-management": {
+      "command": "python",
+      "args": ["server.py"],
+      "cwd": "C:\\Users\\boatr\\MyBoat\\RealFactory\\ProjectRealFactory\\AI-Workshop"
+    }
+  }
+}
