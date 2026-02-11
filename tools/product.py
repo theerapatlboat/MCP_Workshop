@@ -25,12 +25,14 @@ def register(mcp: FastMCP) -> None:
 
         products = []
         for p in raw.get("data", []):
+            raw_qty = p.get("quantity", 0)
+            available = max(0, int(float(raw_qty))) if raw_qty is not None else 0
             products.append({
                 "id": p.get("id"),
                 "name": p.get("name"),
                 "sku": p.get("sku"),
                 "price": p.get("price"),
-                "available_quantity": p.get("quantity", "0"),
+                "available_quantity": available,
                 "total_stock": p.get("stock_quantity", "0"),
                 "status": p.get("status"),
             })
@@ -62,7 +64,7 @@ def register(mcp: FastMCP) -> None:
                         "price": product.get("price"),
                         "original_price": product.get("original_price"),
                         "cost": product.get("cost"),
-                        "available_quantity": product.get("quantity", "0"),
+                        "available_quantity": max(0, int(float(product.get("quantity", 0) or 0))),
                         "reserved_quantity": product.get("reserved_quantity", "0"),
                         "total_stock": product.get("stock_quantity", "0"),
                         "live_quantity": product.get("live_quantity", "0"),
