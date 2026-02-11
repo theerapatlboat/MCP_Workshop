@@ -4,7 +4,11 @@
       "Bash(dir:*)",
       "Bash(pip show:*)",
       "Bash(pip install:*)",
-      "Bash(python -c:*)"
+      "Bash(python -c:*)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Bash(curl:*)",
+      "Bash(python -m json.tool:*)"
     ]
   }
 }
