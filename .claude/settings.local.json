@@ -11,7 +11,10 @@
       "Bash(python -m json.tool:*)",
       "WebFetch(domain:documenter.getpostman.com)",
       "WebFetch(domain:www.postman.com)",
-      "WebFetch(domain:documenter.gw.postman.com)"
+      "WebFetch(domain:documenter.gw.postman.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:openai.github.io)",
+      "Bash(del:*)"
     ]
   }
 }
