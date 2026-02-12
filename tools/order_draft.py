@@ -1,7 +1,7 @@
 """Order Draft tools — create, get, delete, attach payment."""
 
 from mcp.server.fastmcp import FastMCP
-from .config import api_get, api_post, api_delete
+from config import api_get, api_post, api_delete
 
 
 def register(mcp: FastMCP) -> None:

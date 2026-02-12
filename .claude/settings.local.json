@@ -16,7 +16,11 @@
       "WebFetch(domain:openai.github.io)",
       "Bash(del:*)",
       "Bash(git rm:*)",
-      "Bash(git check-ignore:*)"
+      "Bash(git check-ignore:*)",
+      "Bash(python create_excel.py)",
+      "Bash(set PYTHONUTF8=1)",
+      "Bash(python -X utf8 -c \"\nimport sys, io\nsys.stdout = io.TextIOWrapper\\(sys.stdout.buffer, encoding=''utf-8''\\)\nfrom openpyxl import load_workbook\nwb = load_workbook\\(''questionnaire_summary.xlsx''\\)\nws = wb.active\nprint\\(f''Sheet: {ws.title}''\\)\nprint\\(f''Rows: {ws.max_row}, Cols: {ws.max_column}''\\)\nfor row in ws.iter_rows\\(min_row=1, max_row=ws.max_row, values_only=False\\):\n    vals = [str\\(c.value\\) if c.value is not None else '''' for c in row]\n    print\\('' | ''.join\\(vals\\)\\)\n\")",
+      "Bash(git add:*)"
     ]
   }
 }

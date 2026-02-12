@@ -3,8 +3,8 @@
 import json
 
 from mcp.server.fastmcp import FastMCP
-from .config import openai_client
-from .models import AddressVerificationResult
+from config import openai_client
+from models import AddressVerificationResult
 
 
 def register(mcp: FastMCP) -> None:

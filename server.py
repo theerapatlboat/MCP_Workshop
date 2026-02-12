@@ -34,13 +34,18 @@ Run the server:
 """
 
 from mcp.server.fastmcp import FastMCP
-from tools import register_all
+from tools import order_draft, product, shipment, report, order, utilities
 
 # ── MCP Server ──────────────────────────────────
 mcp = FastMCP("Order Management")
 
 # ── Register all tools ──────────────────────────
-register_all(mcp)
+order_draft.register(mcp)
+product.register(mcp)
+shipment.register(mcp)
+report.register(mcp)
+order.register(mcp)
+utilities.register(mcp)
 
 # ── Run ─────────────────────────────────────────
 if __name__ == "__main__":

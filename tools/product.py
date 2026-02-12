@@ -1,7 +1,7 @@
 """Product tools — list and get products."""
 
 from mcp.server.fastmcp import FastMCP
-from .config import api_get
+from config import api_get
 
 
 def register(mcp: FastMCP) -> None:
