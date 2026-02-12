@@ -32,12 +32,18 @@ This server provides tools for:
 ─── Hybrid Search ───
 17. hybrid_search          — ค้นหาสินค้า semantic + substring พร้อม LLM refinement
 
+─── Memory (Long-Term) ───
+18. memory_add             — บันทึก memory ระยะยาวสำหรับผู้ใช้
+19. memory_search          — ค้นหา memory ที่เกี่ยวข้อง
+20. memory_get_all         — ดึง memory ทั้งหมดของผู้ใช้
+21. memory_delete          — ลบ memory ที่ระบุ
+
 Run the server:
     python server.py
 """
 
 from mcp.server.fastmcp import FastMCP
-from tools import order_draft, product, shipment, report, order, utilities, hybrid_search
+from tools import order_draft, product, shipment, report, order, utilities, hybrid_search, memory
 
 # ── MCP Server ──────────────────────────────────
 mcp = FastMCP("Order Management", stateless_http=True)
@@ -50,6 +56,7 @@ report.register(mcp)
 order.register(mcp)
 utilities.register(mcp)
 hybrid_search.register(mcp)
+memory.register(mcp)
 
 # ── Run ─────────────────────────────────────────
 if __name__ == "__main__":

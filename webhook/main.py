@@ -86,7 +86,7 @@ async def forward_to_agent(sender_id: str, text: str) -> str:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
                 AI_AGENT_URL,
-                json={"sender_id": sender_id, "message": text},
+                json={"session_id": sender_id, "message": text},
                 timeout=30,
             )
             resp.raise_for_status()

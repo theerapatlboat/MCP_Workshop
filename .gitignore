@@ -3,3 +3,4 @@
 .mcp.json
 webhook/logs/
 agent/vector_store.db
+mcp-server/mem0_data/

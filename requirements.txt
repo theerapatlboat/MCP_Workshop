@@ -6,3 +6,4 @@ openai-agents>=0.1.0
 python-dotenv>=1.0.0
 faiss-cpu>=1.7.0
 prompt_toolkit>=3.0.0
+mem0ai>=0.1.0

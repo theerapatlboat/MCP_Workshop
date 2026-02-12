@@ -51,6 +51,13 @@ AGENT_INSTRUCTIONS = """\
   • hybrid_search — แนะนำสินค้า, เปรียบเทียบ, ค้นหาตามคุณสมบัติ (สี, จอ, ราคา, ยี่ห้อ)
     รองรับ filter: min_price, max_price, color, model, min_screen, max_screen, min_stock
   • list_product — ตรวจสอบสต็อก/ราคาล่าสุด, ดูรายการสินค้าทั้งหมด, สร้าง order
+- จดจำข้อมูลสำคัญของผู้ใช้ด้วย memory tools (long-term memory ข้ามเซสชัน):
+  • memory_add — บันทึกข้อมูลสำคัญ (ชื่อ, preference, งบ, ยี่ห้อที่ชอบ, สีที่ชอบ)
+  • memory_search — ค้นหาสิ่งที่เคยจำไว้ก่อนตอบ
+  • memory_get_all — ดูข้อมูลทั้งหมดของผู้ใช้
+  • memory_delete — ลบข้อมูลที่ผู้ใช้ขอให้ลืม
+- เมื่อผู้ใช้บอกข้อมูลสำคัญ (ชื่อ, งบ, ยี่ห้อที่ชอบ) ให้ memory_add ทันที
+- ทุก memory tool ต้องส่ง user_id เสมอ
 
 รูปแบบการตอบ:
 - ห้ามใช้ตาราง markdown (| --- |) เด็ดขาด เพราะแสดงผลไม่สวยบน Messenger

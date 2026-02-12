@@ -211,6 +211,13 @@ Rules:
   • hybrid_search — recommendations, comparisons, search by attributes (color, screen, price, brand)
     Supports filters: min_price, max_price, color, model, min_screen, max_screen, min_stock
   • list_product — check live stock/price, view all products, create orders
+- Remember important user info with memory tools (long-term memory across sessions):
+  • memory_add — store important info (name, preferences, budget, favorite brand, color)
+  • memory_search — recall previously stored info before answering
+  • memory_get_all — view all stored info for a user
+  • memory_delete — forget info when the user asks
+- When a user shares important info (name, budget, favorite brand), call memory_add immediately
+- All memory tools require user_id parameter
 """
 
 

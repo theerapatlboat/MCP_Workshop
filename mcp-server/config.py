@@ -1,9 +1,12 @@
 """Shared configuration for MCP tools."""
 
 import os
+from pathlib import Path
+
 import httpx
 from openai import OpenAI
 from dotenv import load_dotenv
+from mem0 import Memory
 
 load_dotenv()
 
@@ -12,6 +15,31 @@ UAT_API_URL = os.getenv("UAT_API_URL", "").rstrip("/")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
+
+# ── mem0 Long-Term Memory ───────────────────────
+mem0_memory = Memory.from_config({
+    "llm": {
+        "provider": "openai",
+        "config": {
+            "model": "gpt-4o-mini",
+            "temperature": 0,
+            "api_key": OPENAI_API_KEY,
+        },
+    },
+    "embedder": {
+        "provider": "openai",
+        "config": {
+            "model": "text-embedding-3-small",
+            "api_key": OPENAI_API_KEY,
+        },
+    },
+    "vector_store": {
+        "provider": "qdrant",
+        "config": {
+            "path": str(Path(__file__).parent / "mem0_data" / "qdrant"),
+        },
+    },
+})
 
 AUTH_HEADERS = {
     "Authorization": f"Bearer {UAT_API_KEY}",
