@@ -303,6 +303,80 @@ def build_faiss_index(embeddings: np.ndarray) -> faiss.IndexFlatIP:
 
 
 # ════════════════════════════════════════════════════════════
+#  PROGRAMMATIC API  (used by MCP tool and other callers)
+# ════════════════════════════════════════════════════════════
+
+def get_connection() -> sqlite3.Connection:
+    """Open a read-only connection to the vector store database.
+
+    For external callers (e.g. MCP tools) that don't need schema migration.
+    Raises FileNotFoundError if the DB doesn't exist yet.
+    """
+    if not DB_PATH.exists():
+        raise FileNotFoundError(
+            f"Vector store DB not found at {DB_PATH}. "
+            "Run 'python agent/vector_search.py' and load data first."
+        )
+    return sqlite3.connect(str(DB_PATH))
+
+
+def hybrid_search(
+    client: OpenAI,
+    conn: sqlite3.Connection,
+    query: str,
+    top_k: int = 5,
+    filters: dict | None = None,
+) -> list[dict]:
+    """Run both vector and substring search, merge and deduplicate results.
+
+    Each result dict includes:
+      - 'score': float for vector hits, None for substring-only
+      - 'source': 'vector', 'substring', or 'both'
+    """
+    merged: dict[int, dict] = {}
+
+    # ── Vector search ────────────────────────────────────
+    if filters:
+        ids, embeddings = load_filtered_embeddings(conn, filters)
+    else:
+        ids, embeddings = load_all_embeddings(conn)
+
+    if embeddings is not None and len(ids) > 0:
+        index = build_faiss_index(embeddings)
+        query_vec = get_embedding(client, query).reshape(1, -1)
+        faiss.normalize_L2(query_vec)
+
+        k = min(top_k, len(ids))
+        scores, indices = index.search(query_vec, k)
+
+        matched_ids = [ids[i] for i in indices[0] if i >= 0]
+        matched_scores = [float(scores[0][j]) for j, i in enumerate(indices[0]) if i >= 0]
+        vector_docs = get_documents_by_ids(conn, matched_ids)
+
+        for doc, score in zip(vector_docs, matched_scores):
+            doc["score"] = score
+            doc["source"] = "vector"
+            merged[doc["id"]] = doc
+
+    # ── Substring search ─────────────────────────────────
+    substr_docs = substring_search(conn, query, filters=filters, limit=top_k)
+    for doc in substr_docs:
+        if doc["id"] in merged:
+            merged[doc["id"]]["source"] = "both"
+        else:
+            doc["score"] = None
+            doc["source"] = "substring"
+            merged[doc["id"]] = doc
+
+    # Sort: vector hits first (by score desc), then substring-only
+    return sorted(
+        merged.values(),
+        key=lambda d: (d["score"] is not None, d["score"] or 0),
+        reverse=True,
+    )
+
+
+# ════════════════════════════════════════════════════════════
 #  SETUP
 # ════════════════════════════════════════════════════════════
 

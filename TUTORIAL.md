@@ -15,7 +15,7 @@
 9. [ทดสอบระบบ](#9-ทดสอบระบบ)
 10. [โครงสร้างโปรเจค](#10-โครงสร้างโปรเจค)
 11. [รายละเอียด Components](#11-รายละเอียด-components)
-12. [Tools ทั้ง 16 ตัว](#12-tools-ทั้ง-16-ตัว)
+12. [Tools ทั้ง 17 ตัว](#12-tools-ทั้ง-17-ตัว)
 13. [CLI Agent — ใช้งานผ่าน Terminal](#13-cli-agent--ใช้งานผ่าน-terminal)
 14. [ระบบ Tracing](#14-ระบบ-tracing)
 15. [Vector Search REPL — ค้นหาเอกสารด้วย AI](#15-vector-search-repl--ค้นหาเอกสารด้วย-ai)
@@ -54,7 +54,7 @@
                       ↓ MCP (Streamable HTTP)          ↓
 ┌─────────────────────────────────────────────┐
 │  MCP Server (port 8000)                     │
-│  - 16 tools สำหรับจัดการออเดอร์              │
+│  - 17 tools สำหรับจัดการออเดอร์              │
 │  - เรียก GoSaaS API จริง                    │
 └─────────────────────────────────────────────┘
 ```
@@ -67,13 +67,13 @@
 
 | Service | Port | ไฟล์ | หน้าที่ |
 |---------|------|------|---------|
-| **MCP Server** | 8000 | `mcp-server/server.py` | เปิด tools 16 ตัวให้ Agent เรียกใช้ผ่าน MCP protocol |
+| **MCP Server** | 8000 | `mcp-server/server.py` | เปิด tools 17 ตัวให้ Agent เรียกใช้ผ่าน MCP protocol |
 | **Webhook** | 8001 | `webhook/main.py` | รับ/ส่งข้อความกับ Facebook Messenger |
 | **Agent API** | 3000 | `agent/agent_api.py` | AI Agent ที่ประมวลผลข้อความและตัดสินใจเรียก tools |
 | **CLI Agent** | — | `agent/run_agents.py` | Agent แบบ interactive CLI สำหรับทดสอบใน terminal |
 | **Vector Search** | — | `agent/vector_search.py` | Interactive REPL สำหรับเก็บและค้นหาเอกสารด้วย semantic search |
 
-### Tools ที่ Agent ใช้ได้ (16 tools)
+### Tools ที่ Agent ใช้ได้ (17 tools)
 
 | หมวด | Tools | ตัวอย่างการใช้ |
 |------|-------|---------------|
@@ -83,6 +83,7 @@
 | **Report** | `get_sales_summary`, `get_sales_summary_today`, `get_sales_filter` | "ยอดขายวันนี้", "สรุปยอดขายเดือนนี้" |
 | **Order** | `get_order_meta` | ดึง metadata สำหรับสร้างออเดอร์ |
 | **Utilities** | `verify_address`, `faq`, `intent_classify` | ตรวจที่อยู่, ตอบคำถามทั่วไป, จัดหมวดหมู่ intent |
+| **Hybrid Search** | `hybrid_search` | "มือถือจอใหญ่ราคาถูก", ค้นหาสินค้าด้วย semantic + substring พร้อม LLM refinement |
 
 ---
 
@@ -427,7 +428,8 @@ AI-Workshop/
 │       ├── shipment.py           # 2 tools: ติดตามพัสดุ/ดูรายละเอียดจัดส่ง
 │       ├── report.py             # 3 tools: สรุปยอดขาย/ยอดวันนี้/ตัวกรอง
 │       ├── order.py              # 1 tool:  ดึง order metadata
-│       └── utilities.py          # 3 tools: ตรวจที่อยู่/FAQ/จัดหมวด intent
+│       ├── utilities.py          # 3 tools: ตรวจที่อยู่/FAQ/จัดหมวด intent
+│       └── hybrid_search.py      # 1 tool:  ค้นหาสินค้า semantic + substring + LLM refinement
 │
 ├── agent/                        # AI Agent
 │   ├── run_agents.py             # CLI version (สำหรับทดสอบใน terminal)
@@ -539,7 +541,7 @@ Agent ตัวเดียวกันแต่รันเป็น interactiv
 
 ---
 
-## 12. Tools ทั้ง 16 ตัว
+## 12. Tools ทั้ง 17 ตัว
 
 ### Order Draft
 
@@ -586,6 +588,62 @@ Agent ตัวเดียวกันแต่รันเป็น interactiv
 | `verify_address` | ตรวจสอบที่อยู่ครบถ้วน |
 | `faq` | ตอบคำถามที่พบบ่อย (AI) |
 | `intent_classify` | จัดประเภท intent ข้อความ |
+
+### Hybrid Search
+
+| Tool | คำอธิบาย |
+|------|----------|
+| `hybrid_search` | ค้นหาสินค้าแบบ hybrid (semantic + substring) พร้อม LLM refinement |
+
+**Parameters:**
+
+| Parameter | Type | Default | คำอธิบาย |
+|-----------|------|---------|----------|
+| `query` | string | — | คำค้นหา (ภาษาไทยหรืออังกฤษ) |
+| `top_k` | int | 5 | จำนวนผลลัพธ์สูงสุดต่อแบบค้นหา |
+| `min_price` | float | null | ราคาขั้นต่ำ (บาท) |
+| `max_price` | float | null | ราคาสูงสุด (บาท) |
+| `color` | string | null | สีสินค้า (partial match) |
+| `model` | string | null | รุ่นสินค้า (partial match) |
+| `min_screen` | float | null | ขนาดหน้าจอขั้นต่ำ (นิ้ว) |
+| `max_screen` | float | null | ขนาดหน้าจอสูงสุด (นิ้ว) |
+| `min_stock` | int | null | จำนวนคงเหลือขั้นต่ำ |
+
+**วิธีทำงาน:**
+
+1. **Semantic Search** — ค้นหาตามความหมายด้วย OpenAI embeddings + FAISS (เช่น "มือถือจอใหญ่ราคาถูก")
+2. **Substring Search** — ค้นหาตรงตัวอักษร SQL LIKE ใน text, name, sku, color, model (เช่น SKU "IPH-16PM")
+3. **Merge & Deduplicate** — รวมผลลัพธ์จากทั้ง 2 วิธี ตัดรายการซ้ำ
+4. **LLM Refinement** — ใช้ GPT-4o-mini กรองผลลัพธ์ที่ไม่เกี่ยวข้องออก (เมื่อสงสัย จะเก็บไว้ — ให้ recall สูงกว่า precision)
+
+**ตัวอย่าง response:**
+
+```json
+{
+  "success": true,
+  "query": "มือถือจอใหญ่",
+  "filters": {"min_price": 20000},
+  "total_candidates": 10,
+  "refined_count": 5,
+  "results": [
+    {
+      "id": 1,
+      "name": "iPhone 16 Pro Max",
+      "sku": "IPH-16PM-BLK-256",
+      "price": 52900,
+      "price_formatted": "52,900 บาท",
+      "stock": 15,
+      "color": "ดำไทเทเนียม",
+      "model": "iPhone 16 Pro Max",
+      "screen_size": 6.9,
+      "score": 0.8234,
+      "source": "vector"
+    }
+  ]
+}
+```
+
+> **หมายเหตุ:** tool นี้ต้องมีข้อมูลใน vector store ก่อน — ใช้ `python agent/vector_search.py` แล้วรัน `load <product_file>` เพื่อนำเข้าสินค้า
 
 ---
 
@@ -690,8 +748,13 @@ Interactive REPL สำหรับเก็บและค้นหาเอก
 คำสั่ง add:
   ข้อความ → OpenAI Embedding API → เก็บใน SQLite (text + vector)
 
-คำสั่ง search:
-  คำค้นหา → OpenAI Embedding API → ค้นหาด้วย FAISS → แสดงผลจาก SQLite
+คำสั่ง load:
+  ไฟล์สินค้า → parse metadata → แปลงเป็นภาษาธรรมชาติ → batch embed → เก็บใน SQLite (text + vector + metadata)
+
+คำสั่ง search (hybrid):
+  คำค้นหา → [1] OpenAI Embedding → FAISS (semantic)
+           → [2] SQLite LIKE (substring)
+           → แสดงผลแยก 2 sections พร้อม ★ overlap marking
 ```
 
 | เทคโนโลยี | หน้าที่ |
@@ -782,7 +845,7 @@ vector> quit
 
 | ฟีเจอร์ | คำอธิบาย |
 |---------|----------|
-| **Autocomplete** | กด Tab เพื่อเติมคำสั่ง (add, search, list, count, help, quit) |
+| **Autocomplete** | กด Tab เพื่อเติมคำสั่ง (add, load, search, list, count, help, quit) |
 | **Command History** | กดลูกศรขึ้น/ลงเพื่อเรียกคำสั่งก่อนหน้า |
 | **Colored Prompt** | prompt `vector>` แสดงสีฟ้า (cyan) |
 | **Ctrl+C / Ctrl+D** | ออกจากโปรแกรมได้ทุกเมื่อ |
@@ -792,27 +855,130 @@ vector> quit
 | คำสั่ง | คำอธิบาย | ตัวอย่าง |
 |--------|----------|----------|
 | `add <text>` | เพิ่มเอกสารลง vector store | `add ข้อความที่ต้องการเก็บ` |
-| `search <query>` | ค้นหาเอกสารที่คล้ายกัน (top 5) | `search คำค้นหา` |
+| `load <filepath>` | นำเข้าไฟล์ — ตรวจจับอัตโนมัติว่าเป็นไฟล์สินค้า (structured) หรือ plain text | `load products.txt` |
+| `search <query>` | Hybrid search: semantic + substring (top 5) | `search มือถือจอใหญ่` |
 | `search <query> /N` | กำหนดจำนวนผลลัพธ์ | `search AI /3` |
+| `search <query> --flag` | ค้นหาพร้อม metadata filter | `search iPhone --min-price 20000 --color ดำ` |
 | `list` | แสดงเอกสารทั้งหมดในฐานข้อมูล | `list` |
 | `count` | แสดงจำนวนเอกสาร | `count` |
 | `help` | แสดงรายการคำสั่ง | `help` |
 | `quit` / `exit` / `q` | ออกจากโปรแกรม | `quit` |
 
+### Metadata Filters สำหรับ Search
+
+ใช้ flags เพิ่มท้ายคำสั่ง `search` เพื่อกรองผลลัพธ์ตาม metadata ของสินค้า:
+
+| Flag | คำอธิบาย | ตัวอย่าง |
+|------|----------|----------|
+| `--min-price N` | ราคาขั้นต่ำ (บาท) | `--min-price 10000` |
+| `--max-price N` | ราคาสูงสุด (บาท) | `--max-price 30000` |
+| `--color X` | สีสินค้า (partial match) | `--color ดำ` |
+| `--model X` | รุ่นสินค้า (partial match) | `--model Galaxy` |
+| `--min-screen N` | ขนาดหน้าจอขั้นต่ำ (นิ้ว) | `--min-screen 6.5` |
+| `--max-screen N` | ขนาดหน้าจอสูงสุด (นิ้ว) | `--max-screen 6.8` |
+| `--min-stock N` | จำนวนคงเหลือขั้นต่ำ | `--min-stock 10` |
+
+**ตัวอย่างการใช้ filters:**
+
+```
+vector> search มือถือจอใหญ่ --min-price 20000 --max-price 40000
+vector> search iPhone สีดำ --min-stock 10 /3
+vector> search IPH-16PM                        (substring finds exact SKU)
+```
+
+### รูปแบบไฟล์สินค้า (Product File Format)
+
+คำสั่ง `load` จะตรวจจับไฟล์สินค้าอัตโนมัติจาก header ที่เป็น pipe-delimited (`|`):
+
+```
+id | name | sku | price | stock | color | model | screen_size
+1 | iPhone 16 Pro Max | IPH-16PM-BLK-256 | 52900 | 15 | ดำไทเทเนียม | iPhone 16 Pro Max | 6.9
+2 | Samsung Galaxy S24 Ultra | SAM-S24U-BLK-256 | 44900 | 20 | ดำ Titanium | Galaxy S24 Ultra | 6.8
+```
+
+เมื่อตรวจพบไฟล์สินค้า ระบบจะ:
+
+1. Parse metadata columns (name, sku, price, stock, color, model, screen_size)
+2. แปลงแต่ละแถวเป็น **ภาษาธรรมชาติ** ก่อน embed เช่น:
+   `"iPhone 16 Pro Max สีดำไทเทเนียม หน้าจอ 6.9 นิ้ว ราคา 52,900 บาท มีสินค้า 15 เครื่อง (SKU: IPH-16PM-BLK-256)"`
+3. Batch embed ด้วย OpenAI API (ทีละ 100 รายการ) แล้วเก็บลง SQLite พร้อม metadata
+
+ถ้าไฟล์ไม่มี header ที่ตรงกัน จะถือเป็น **plain text** — แต่ละบรรทัด = 1 document
+
+**ตัวอย่างการนำเข้า:**
+
+```
+vector> load data/products.txt
+  Detected structured product file: products.txt
+  Found 25 products to import
+  Converting rows to natural language for embedding...
+
+  Sample (row 1):
+    "iPhone 16 Pro Max สีดำไทเทเนียม หน้าจอ 6.9 นิ้ว ราคา 52,900 บาท มีสินค้า 15 เครื่อง (SKU: IPH-16PM-BLK-256)"
+
+  Imported 25/25...
+  Done! 25 products imported from products.txt
+  Metadata columns stored: name, sku, price, stock, color, model, screen_size
+  Use '--min-price', '--max-price', '--color', '--model' flags with search to filter
+```
+
+### Hybrid Search — ผลลัพธ์ 2 ส่วน
+
+ทุกคำสั่ง `search` จะรันการค้นหา 2 แบบพร้อมกันและแสดงผลแยกส่วน:
+
+```
+vector> search iPhone --min-price 30000
+
+  Hybrid search: "iPhone"
+  Filters: {'min_price': '30000'}
+
+  ════════════════════ Semantic Search (ความหมายใกล้เคียง) ════════════════════
+
+  [1] (score: 0.7234)  ID: 1
+      Name:   iPhone 16 Pro Max
+      SKU:    IPH-16PM-BLK-256
+      Price:  52,900 บาท
+      Stock:  15 เครื่อง
+      Color:  ดำไทเทเนียม
+      Model:  iPhone 16 Pro Max
+      Screen: 6.9 นิ้ว
+
+  ════════════════════ Substring Search (ตรงตัวอักษร) ════════════════════
+
+  [1] ID: 1 ★
+      Name:   iPhone 16 Pro Max
+      ...
+
+  ★ = also appeared in semantic results
+```
+
+- **Semantic Search** — ค้นหาตามความหมายด้วย OpenAI embeddings + FAISS (score สูง = ตรงกว่า)
+- **Substring Search** — ค้นหาตรงตัวอักษร (SQL LIKE) ใน text, name, sku, color, model
+- เครื่องหมาย **★** แสดงผลลัพธ์ที่ปรากฏทั้ง 2 วิธี (overlap — ยืนยันว่าตรงจริง)
+
 ### โครงสร้างโค้ด (`agent/vector_search.py`)
 
 | ส่วน | ฟังก์ชัน | หน้าที่ |
 |------|---------|---------|
-| **SQLite Layer** | `init_db()` | สร้าง/เปิดฐานข้อมูล SQLite |
-| | `store_document()` | บันทึกข้อความ + embedding |
+| **SQLite Layer** | `init_db()` | สร้าง/เปิดฐานข้อมูล SQLite + auto-migrate metadata columns |
+| | `store_document()` | บันทึกข้อความ + embedding + metadata |
 | | `load_all_embeddings()` | โหลด embeddings ทั้งหมดสำหรับสร้าง index |
+| | `load_filtered_embeddings()` | โหลด embeddings ที่ผ่าน metadata filters |
+| | `substring_search()` | ค้นหาด้วย SQL LIKE ใน text, name, sku, color, model |
 | | `get_documents_by_ids()` | ดึงข้อความจาก ID |
 | | `get_document_count()` | นับจำนวนเอกสาร |
 | | `get_all_documents()` | ดึงเอกสารทั้งหมด |
+| **NL Conversion** | `row_to_natural_language()` | แปลง product row เป็นประโยคภาษาธรรมชาติสำหรับ embedding |
 | **Embedding Layer** | `get_embedding()` | เรียก OpenAI API แปลงข้อความเป็น vector |
+| | `get_embeddings_batch()` | Embed หลายข้อความในครั้งเดียว (batch) |
 | **FAISS Layer** | `build_faiss_index()` | สร้าง FAISS index จาก embeddings |
+| **Programmatic API** | `get_connection()` | เปิด read-only connection สำหรับ MCP tool |
+| | `hybrid_search()` | ค้นหาแบบ vector + substring, merge และ deduplicate |
+| **File Parser** | `parse_product_file()` | ตรวจและ parse ไฟล์สินค้าแบบ pipe-delimited |
 | **Commands** | `cmd_add()` | จัดการคำสั่ง add |
-| | `cmd_search()` | จัดการคำสั่ง search |
+| | `cmd_load()` | จัดการคำสั่ง load (auto-detect product vs plain text) |
+| | `cmd_search()` | จัดการคำสั่ง search (hybrid: semantic + substring) |
+| | `parse_filters()` | แยก filter flags (--min-price, --color ฯลฯ) จาก query |
 | | `cmd_list()` | จัดการคำสั่ง list |
 | | `cmd_count()` | จัดการคำสั่ง count |
 | | `show_help()` | แสดงรายการคำสั่ง |
@@ -827,16 +993,25 @@ vector> quit
 
 3. **SQLite Persistence** — ข้อมูลทั้งหมดเก็บใน `agent/vector_store.db` ประกอบด้วย:
    - `id` — รหัสเอกสาร (auto increment)
-   - `text` — ข้อความต้นฉบับ
+   - `text` — ข้อความต้นฉบับ (หรือ natural language สำหรับสินค้า)
    - `embedding` — vector เก็บเป็น BLOB (6,144 bytes ต่อเอกสาร)
    - `created_at` — วันเวลาที่เพิ่ม
+   - `name` — ชื่อสินค้า (TEXT, nullable)
+   - `sku` — รหัสสินค้า (TEXT, nullable)
+   - `price` — ราคา (REAL, nullable)
+   - `stock` — จำนวนคงเหลือ (INTEGER, nullable)
+   - `color` — สี (TEXT, nullable)
+   - `model` — รุ่น (TEXT, nullable)
+   - `screen_size` — ขนาดหน้าจอ (REAL, nullable)
 
 ### หมายเหตุ
 
 - ต้องมี `OPENAI_API_KEY` ใน `.env` (ใช้ key เดียวกับ Agent)
-- ไฟล์ `vector_store.db` สร้างอัตโนมัติเมื่อรัน `add` ครั้งแรก
-- Score ยิ่งสูง = ยิ่งตรงกับคำค้นหา (0.0 ถึง 1.0)
+- ไฟล์ `vector_store.db` สร้างอัตโนมัติเมื่อรัน `add` หรือ `load` ครั้งแรก
+- Score ยิ่งสูง = ยิ่งตรงกับคำค้นหา (0.0 ถึง 1.0) — ส่วน Substring Search ไม่มี score
 - รองรับทุกภาษาที่ OpenAI embedding รองรับ (ไทย, อังกฤษ, จีน, ญี่ปุ่น ฯลฯ)
+- Metadata columns (name, sku, price ฯลฯ) เป็น nullable — ฐานข้อมูลเก่าจะถูก auto-migrate เมื่อเปิดใช้งาน
+- MCP tool `hybrid_search` ใช้ `get_connection()` + `hybrid_search()` จากไฟล์นี้โดยตรง
 
 ---
 

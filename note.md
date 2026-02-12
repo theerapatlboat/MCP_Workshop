@@ -22,3 +22,6 @@ https://zaida-untrampled-overgreatly.ngrok-free.dev/webhook
 - get
 - get all
 - delete 
+
+- long term in mcp men0
+- short term in agent

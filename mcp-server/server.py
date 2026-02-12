@@ -29,12 +29,15 @@ This server provides tools for:
 15. faq                    — ตอบคำถามที่พบบ่อย (OpenAI)
 16. intent_classify        — จัดประเภทข้อความผู้ใช้ (OpenAI)
 
+─── Hybrid Search ───
+17. hybrid_search          — ค้นหาสินค้า semantic + substring พร้อม LLM refinement
+
 Run the server:
     python server.py
 """
 
 from mcp.server.fastmcp import FastMCP
-from tools import order_draft, product, shipment, report, order, utilities
+from tools import order_draft, product, shipment, report, order, utilities, hybrid_search
 
 # ── MCP Server ──────────────────────────────────
 mcp = FastMCP("Order Management", stateless_http=True)
@@ -46,6 +49,7 @@ shipment.register(mcp)
 report.register(mcp)
 order.register(mcp)
 utilities.register(mcp)
+hybrid_search.register(mcp)
 
 # ── Run ─────────────────────────────────────────
 if __name__ == "__main__":
