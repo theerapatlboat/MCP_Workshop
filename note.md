@@ -24,4 +24,4 @@ https://zaida-untrampled-overgreatly.ngrok-free.dev/webhook
 - delete 
 
 - long term in mcp men0
-- short term in agent
+- short term in agent not tool
