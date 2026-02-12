@@ -122,29 +122,7 @@ def load_filtered_embeddings(
     conn: sqlite3.Connection, filters: dict
 ) -> tuple[list[int], np.ndarray | None]:
     """Load embeddings matching metadata filters. Returns ([], None) if empty."""
-    where_clauses = []
-    params = []
-
-    for key, value in filters.items():
-        if key == "min_price":
-            where_clauses.append("price >= ?")
-            params.append(float(value))
-        elif key == "max_price":
-            where_clauses.append("price <= ?")
-            params.append(float(value))
-        elif key == "min_screen":
-            where_clauses.append("screen_size >= ?")
-            params.append(float(value))
-        elif key == "max_screen":
-            where_clauses.append("screen_size >= ?")
-            params.append(float(value))
-        elif key in ("name", "color", "model", "sku"):
-            where_clauses.append(f"{key} LIKE ?")
-            params.append(f"%{value}%")
-        elif key == "min_stock":
-            where_clauses.append("stock >= ?")
-            params.append(int(value))
-
+    where_clauses, params = _build_filter_clauses(filters)
     where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
     rows = conn.execute(
         f"SELECT id, embedding FROM documents WHERE {where_sql} ORDER BY id",
@@ -158,6 +136,75 @@ def load_filtered_embeddings(
         dtype=np.float32,
     )
     return ids, vectors
+
+
+def _build_filter_clauses(filters: dict) -> tuple[list[str], list]:
+    """Build SQL WHERE clauses from a filters dict. Shared by filtered embeddings and substring search."""
+    where_clauses = []
+    params = []
+    for key, value in filters.items():
+        if key == "min_price":
+            where_clauses.append("price >= ?")
+            params.append(float(value))
+        elif key == "max_price":
+            where_clauses.append("price <= ?")
+            params.append(float(value))
+        elif key == "min_screen":
+            where_clauses.append("screen_size >= ?")
+            params.append(float(value))
+        elif key == "max_screen":
+            where_clauses.append("screen_size <= ?")
+            params.append(float(value))
+        elif key in ("name", "color", "model", "sku"):
+            where_clauses.append(f"{key} LIKE ?")
+            params.append(f"%{value}%")
+        elif key == "min_stock":
+            where_clauses.append("stock >= ?")
+            params.append(int(value))
+    return where_clauses, params
+
+
+def substring_search(
+    conn: sqlite3.Connection,
+    query: str,
+    filters: dict | None = None,
+    limit: int = 5,
+) -> list[dict]:
+    """Search documents by substring match across text and metadata columns.
+
+    Searches: text, name, sku, color, model.
+    Returns list of document dicts (same shape as get_documents_by_ids).
+    """
+    like_param = f"%{query}%"
+    # Substring match across multiple columns
+    text_match = "(text LIKE ? OR name LIKE ? OR sku LIKE ? OR color LIKE ? OR model LIKE ?)"
+    params: list = [like_param] * 5
+
+    # Apply metadata filters if provided
+    if filters:
+        filter_clauses, filter_params = _build_filter_clauses(filters)
+        if filter_clauses:
+            where_sql = f"{text_match} AND " + " AND ".join(filter_clauses)
+            params.extend(filter_params)
+        else:
+            where_sql = text_match
+    else:
+        where_sql = text_match
+
+    rows = conn.execute(
+        f"""SELECT id, text, created_at, name, sku, price, stock, color, model, screen_size
+            FROM documents WHERE {where_sql} ORDER BY id LIMIT ?""",
+        params + [limit],
+    ).fetchall()
+
+    return [
+        {
+            "id": r[0], "text": r[1], "created_at": r[2],
+            "name": r[3], "sku": r[4], "price": r[5],
+            "stock": r[6], "color": r[7], "model": r[8], "screen_size": r[9],
+        }
+        for r in rows
+    ]
 
 
 def get_documents_by_ids(conn: sqlite3.Connection, doc_ids: list[int]) -> list[dict]:
@@ -349,8 +396,33 @@ def parse_filters(rest: str) -> tuple[str, dict]:
     return query.strip(), filters
 
 
+def _print_doc(doc: dict, rank: int, score: float | None = None, overlap: bool = False) -> None:
+    """Print a single search result document."""
+    overlap_mark = " ★" if overlap else ""
+    if score is not None:
+        print(f"\n  [{rank}] (score: {score:.4f})  ID: {doc['id']}{overlap_mark}")
+    else:
+        print(f"\n  [{rank}] ID: {doc['id']}{overlap_mark}")
+
+    if doc.get("name"):
+        price_str = f"{int(doc['price']):,}" if doc.get("price") else "-"
+        print(f"      Name:   {doc['name']}")
+        print(f"      SKU:    {doc.get('sku', '-')}")
+        print(f"      Price:  {price_str} บาท")
+        print(f"      Stock:  {doc.get('stock', '-')} เครื่อง")
+        print(f"      Color:  {doc.get('color', '-')}")
+        print(f"      Model:  {doc.get('model', '-')}")
+        print(f"      Screen: {doc.get('screen_size', '-')} นิ้ว")
+    else:
+        text_preview = doc["text"][:200]
+        if len(doc["text"]) > 200:
+            text_preview += "..."
+        print(f"      Added: {doc['created_at']}")
+        print(f"      {text_preview}")
+
+
 def cmd_search(client: OpenAI, conn: sqlite3.Connection, query: str, top_k: int = 5) -> None:
-    """Embed query, search FAISS, display ranked results with metadata."""
+    """Hybrid search: run both vector (semantic) and substring (text-match) search, display both."""
     if not query:
         print("  Usage: search <query>  or  search <query> /N")
         print("  Filters: --min-price N --max-price N --color X --model X --min-screen N --min-stock N")
@@ -362,60 +434,59 @@ def cmd_search(client: OpenAI, conn: sqlite3.Connection, query: str, top_k: int 
         print("  Error: Query text is empty after parsing filters.")
         return
 
-    # Load embeddings (filtered or all)
-    if filters:
-        ids, embeddings = load_filtered_embeddings(conn, filters)
-        if embeddings is None:
-            print("  No documents match the given filters.")
-            return
-        print(f"  Filtered to {len(ids)} documents")
-    else:
-        ids, embeddings = load_all_embeddings(conn)
-        if embeddings is None:
-            print("  No documents in the store yet. Use 'add <text>' or 'load <filepath>' first.")
-            return
-
-    index = build_faiss_index(embeddings)
-
-    try:
-        query_vec = get_embedding(client, clean_query)
-    except Exception as e:
-        print(f"  Error: Failed to generate embedding: {e}")
-        return
-
-    query_vec = query_vec.reshape(1, -1)
-    faiss.normalize_L2(query_vec)
-
-    k = min(top_k, len(ids))
-    scores, indices = index.search(query_vec, k)
-
-    matched_ids = [ids[i] for i in indices[0] if i >= 0]
-    matched_scores = [float(scores[0][j]) for j, i in enumerate(indices[0]) if i >= 0]
-    docs = get_documents_by_ids(conn, matched_ids)
-
-    print(f'\n  Results for: "{clean_query}"')
+    print(f'\n  Hybrid search: "{clean_query}"')
     if filters:
         print(f"  Filters: {filters}")
-    print("  " + "=" * 58)
-    for rank, (doc, score) in enumerate(zip(docs, matched_scores), 1):
-        print(f"\n  [{rank}] (score: {score:.4f})  ID: {doc['id']}")
 
-        # Show metadata if available
-        if doc.get("name"):
-            price_str = f"{int(doc['price']):,}" if doc.get("price") else "-"
-            print(f"      Name:   {doc['name']}")
-            print(f"      SKU:    {doc.get('sku', '-')}")
-            print(f"      Price:  {price_str} บาท")
-            print(f"      Stock:  {doc.get('stock', '-')} เครื่อง")
-            print(f"      Color:  {doc.get('color', '-')}")
-            print(f"      Model:  {doc.get('model', '-')}")
-            print(f"      Screen: {doc.get('screen_size', '-')} นิ้ว")
+    # ── Vector (Semantic) Search ──────────────────────────
+    vector_ids: list[int] = []
+    if filters:
+        ids, embeddings = load_filtered_embeddings(conn, filters)
+    else:
+        ids, embeddings = load_all_embeddings(conn)
+
+    if embeddings is not None:
+        index = build_faiss_index(embeddings)
+        try:
+            query_vec = get_embedding(client, clean_query)
+        except Exception as e:
+            print(f"  Error: Failed to generate embedding: {e}")
+            return
+
+        query_vec = query_vec.reshape(1, -1)
+        faiss.normalize_L2(query_vec)
+
+        k = min(top_k, len(ids))
+        scores, indices = index.search(query_vec, k)
+
+        matched_ids = [ids[i] for i in indices[0] if i >= 0]
+        matched_scores = [float(scores[0][j]) for j, i in enumerate(indices[0]) if i >= 0]
+        vector_docs = get_documents_by_ids(conn, matched_ids)
+        vector_ids = [d["id"] for d in vector_docs]
+
+        print(f"\n  {'═' * 20} Semantic Search (ความหมายใกล้เคียง) {'═' * 20}")
+        if vector_docs:
+            for rank, (doc, score) in enumerate(zip(vector_docs, matched_scores), 1):
+                _print_doc(doc, rank, score=score)
         else:
-            text_preview = doc["text"][:200]
-            if len(doc["text"]) > 200:
-                text_preview += "..."
-            print(f"      Added: {doc['created_at']}")
-            print(f"      {text_preview}")
+            print("\n  No semantic results found.")
+    else:
+        print(f"\n  {'═' * 20} Semantic Search (ความหมายใกล้เคียง) {'═' * 20}")
+        print("\n  No documents in the store yet.")
+
+    # ── Substring (Text-Match) Search ─────────────────────
+    vector_id_set = set(vector_ids)
+    substr_docs = substring_search(conn, clean_query, filters=filters, limit=top_k)
+
+    print(f"\n  {'═' * 20} Substring Search (ตรงตัวอักษร) {'═' * 20}")
+    if substr_docs:
+        for rank, doc in enumerate(substr_docs, 1):
+            overlap = doc["id"] in vector_id_set
+            _print_doc(doc, rank, overlap=overlap)
+        if any(d["id"] in vector_id_set for d in substr_docs):
+            print("\n  ★ = also appeared in semantic results")
+    else:
+        print("\n  No substring matches found.")
     print()
 
 
@@ -561,12 +632,18 @@ def show_help() -> None:
   Commands:
     add <text>         Add a document to the store
     load <filepath>    Import a file (auto-detects structured product vs plain text)
-    search <query>     Search for similar documents (top 5)
+    search <query>     Hybrid search: semantic + substring (top 5)
     search <query> /N  Search with custom top-k (e.g. /3)
     list               List all stored documents
     count              Show document count
     help               Show this help message
     quit               Exit
+
+  Hybrid Search:
+    Every search runs BOTH methods and shows two result sections:
+      1. Semantic Search  — finds documents with similar meaning (via embeddings)
+      2. Substring Search — finds documents containing the exact query text
+    Results appearing in both sections are marked with ★
 
   Search Filters (append to search query):
     --min-price 10000  Minimum price
@@ -580,6 +657,7 @@ def show_help() -> None:
   Example:
     search มือถือจอใหญ่ --min-price 20000 --max-price 40000
     search iPhone สีดำ --min-stock 10 /3
+    search IPH-16PM                        (substring finds exact SKU)
 """)
 
 

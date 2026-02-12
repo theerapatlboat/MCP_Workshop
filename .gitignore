@@ -2,3 +2,4 @@
 **/__pycache__/
 .mcp.json
 webhook/logs/
+agent/vector_store.db

@@ -35,7 +35,10 @@
       "Bash(python:*)",
       "Bash(cmd /c del:*)",
       "Bash(findstr:*)",
-      "Bash(where:*)"
+      "Bash(where:*)",
+      "Bash(wc:*)",
+      "Bash(echo:*)",
+      "Bash(set PYTHONIOENCODING=utf-8:*)"
     ]
   }
 }
