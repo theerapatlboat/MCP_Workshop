@@ -30,14 +30,17 @@ def register(mcp: FastMCP) -> None:
         return api_get("/shipment/shipping-status", params)
 
     @mcp.tool()
-    def get_shipment(order_draft_id: int) -> dict:
+    def get_shipment(order_draft_id: str) -> dict:
         """
         ดึงข้อมูล shipment ตาม order_draft_id.
 
         Args:
-            order_draft_id: ID ของ order draft
+            order_draft_id: MongoDB _id ของ order draft (24 ตัวอักษร hex)
+                            เช่น "68690f09bd2ab611975b4df6"
+                            ⚠️ ค่านี้คือ field "_id" จาก response ของ create_order_draft
+                            หรือ get_order_draft — ห้ามใช้เลขที่เอกสาร เช่น "ODD..."
 
         Returns:
             Shipment details
         """
-        return api_get("/shipment", {"order_draft_id": str(order_draft_id)})
+        return api_get("/shipment", {"order_draft_id": order_draft_id})

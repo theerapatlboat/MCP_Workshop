@@ -23,7 +23,18 @@
       "Bash(git add:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nRefactor: move config and models to root, simplify tool registration\n\n- Move config.py and models.py from tools/ to project root\n- Update all tool imports to use absolute imports\n- Simplify tools/__init__.py and register modules directly in server.py\n- Add .mcp.json to .gitignore and remove from tracking\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git mv:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(python -X utf8 -c:*)",
+      "Bash(grep:*)",
+      "Bash(powershell -Command \"Invoke-WebRequest -Uri ''https://documenter.getpostman.com/view/9328806/2sB2xEBULX'' -UseBasicParsing | Select-Object -ExpandProperty Content | Select-String -Pattern ''shipment'' -AllMatches\")",
+      "Bash(powershell -Command \"\\(Invoke-WebRequest -Uri ''https://documenter.getpostman.com/view/9328806/2sB2xEBULX'' -UseBasicParsing\\).Content.Length\")",
+      "Bash(powershell -Command \"$html = \\(Invoke-WebRequest -Uri ''https://documenter.getpostman.com/view/9328806/2sB2xEBULX'' -UseBasicParsing\\).Content; $matches = [regex]::Matches\\($html, ''https?://[^\\\\s\\\\x22\\\\x27<>]+''\\); foreach\\($m in $matches\\) { Write-Output $m.Value }\")",
+      "Bash(powershell -Command \"$html = \\(Invoke-WebRequest -Uri ''https://documenter.getpostman.com/view/9328806/2sB2xEBULX'' -UseBasicParsing\\).Content; [regex]::Matches\\($html, ''publishedId[^,}]+''\\) | ForEach-Object { $_Value }\")",
+      "Bash(powershell -Command \"Invoke-WebRequest -Uri ''https://documenter.getpostman.com/view/9328806/2sB2xEBULX'' -UseBasicParsing -OutFile ''C:\\\\Users\\\\boatr\\\\MyBoat\\\\RealFactory\\\\ProjectRealFactory\\\\AI-Workshop\\\\postman_temp.html''\")",
+      "Bash(powershell -Command:*)",
+      "Bash(python:*)",
+      "Bash(cmd /c del:*)",
+      "Bash(findstr:*)"
     ]
   }
 }
