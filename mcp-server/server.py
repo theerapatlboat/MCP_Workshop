@@ -37,7 +37,7 @@ from mcp.server.fastmcp import FastMCP
 from tools import order_draft, product, shipment, report, order, utilities
 
 # ── MCP Server ──────────────────────────────────
-mcp = FastMCP("Order Management")
+mcp = FastMCP("Order Management", stateless_http=True)
 
 # ── Register all tools ──────────────────────────
 order_draft.register(mcp)
