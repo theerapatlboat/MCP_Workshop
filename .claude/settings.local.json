@@ -34,7 +34,8 @@
       "Bash(powershell -Command:*)",
       "Bash(python:*)",
       "Bash(cmd /c del:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(where:*)"
     ]
   }
 }

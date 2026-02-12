@@ -1,3 +1,4 @@
 .env
 **/__pycache__/
 .mcp.json
+webhook/logs/
