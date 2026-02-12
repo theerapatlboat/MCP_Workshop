@@ -30,6 +30,7 @@ from agents import (
 )
 from agents.mcp import MCPServerStreamableHttp
 from openai.types.responses import ResponseTextDeltaEvent
+from session_store import SessionStore
 
 load_dotenv()
 
@@ -187,8 +188,10 @@ class ConsoleTraceProcessor:
 # ════════════════════════════════════════════════════════════
 
 MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://localhost:8000/mcp")
-
 AGENT_MODEL = os.getenv("AGENT_MODEL", "gpt-4o-mini")
+CLI_SESSION_ID = os.getenv("CLI_SESSION_ID", "cli")
+
+session_store = SessionStore()
 
 AGENT_INSTRUCTIONS = """\
 You are GoSaaS Order Management Assistant.
@@ -226,8 +229,13 @@ Rules:
 # ════════════════════════════════════════════════════════════
 
 async def chat_loop(agent: Agent) -> None:
-    """Interactive conversation loop with streaming and history."""
-    history: list = []
+    """Interactive conversation loop with streaming and persistent history."""
+    history = session_store.get(CLI_SESSION_ID)
+
+    if history:
+        print(f"\n  Session: {CLI_SESSION_ID} (resumed {len(history)} messages)")
+    else:
+        print(f"\n  Session: {CLI_SESSION_ID} (new)")
 
     print("\nCommands:")
     print("  Type your message to chat")
@@ -247,7 +255,8 @@ async def chat_loop(agent: Agent) -> None:
             print("Goodbye!")
             return
         if user_input.lower() == "clear":
-            history.clear()
+            session_store.delete(CLI_SESSION_ID)
+            history = []
             print("[Conversation history cleared]\n")
             continue
 
@@ -270,6 +279,7 @@ async def chat_loop(agent: Agent) -> None:
 
             # Preserve full conversation history for next turn
             history = result.to_input_list()
+            session_store.save(CLI_SESSION_ID, history)
 
         except Exception as e:
             print(f"\n\n[Error: {e}]\n")
@@ -318,5 +328,28 @@ async def main():
         sys.exit(1)
 
 
+async def main_tui():
+    """Launch the TUI version of the agent."""
+    from tui.app import AgentTuiApp
+
+    app = AgentTuiApp(
+        mcp_url=MCP_SERVER_URL,
+        model=AGENT_MODEL,
+        session_id=CLI_SESSION_ID,
+        session_store=session_store,
+        agent_instructions=AGENT_INSTRUCTIONS,
+    )
+    await app.run_async()
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    import argparse
+
+    parser = argparse.ArgumentParser(description="GoSaaS Order Management Agent")
+    parser.add_argument("--tui", action="store_true", help="Launch TUI interface")
+    args = parser.parse_args()
+
+    if args.tui:
+        asyncio.run(main_tui())
+    else:
+        asyncio.run(main())

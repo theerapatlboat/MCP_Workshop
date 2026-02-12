@@ -1,0 +1,70 @@
+Screen {
+    layout: vertical;
+}
+
+#main-body {
+    layout: horizontal;
+    height: 1fr;
+}
+
+#chat-panel {
+    width: 55%;
+    border: solid $primary;
+    padding: 0 1;
+}
+
+#right-panel {
+    width: 45%;
+    border: solid $secondary;
+}
+
+#chat-log {
+    height: 1fr;
+}
+
+RichLog {
+    height: 1fr;
+}
+
+#input-bar {
+    dock: bottom;
+    height: 3;
+    padding: 0 1;
+    layout: horizontal;
+}
+
+#user-input {
+    width: 1fr;
+}
+
+#send-btn {
+    width: 12;
+}
+
+#ltm-controls {
+    height: 3;
+    layout: horizontal;
+}
+
+#ltm-controls Input {
+    width: 1fr;
+}
+
+#ltm-controls Button {
+    width: 14;
+}
+
+#session-refresh {
+    height: 3;
+    width: 100%;
+}
+
+#session-info {
+    height: 2;
+    padding: 0 1;
+    color: $text-muted;
+}
+
+#session-list {
+    height: 1fr;
+}

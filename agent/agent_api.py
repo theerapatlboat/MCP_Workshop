@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 
 from agents import Agent, Runner, trace
 from agents.mcp import MCPServerStreamableHttp
+from session_store import SessionStore
 
 load_dotenv()
 
@@ -67,10 +68,10 @@ AGENT_INSTRUCTIONS = """\
 """
 
 # ════════════════════════════════════════════════════════════
-#  IN-MEMORY SESSION STORE
+#  SESSION STORE (SQLite-backed)
 # ════════════════════════════════════════════════════════════
 
-sessions: dict[str, list] = {}
+session_store = SessionStore()
 
 # ════════════════════════════════════════════════════════════
 #  LIFESPAN — connect/disconnect MCP
@@ -140,8 +141,8 @@ async def chat(req: ChatRequest):
     # Resolve session_id
     session_id = req.session_id or uuid.uuid4().hex[:8]
 
-    # Get or create conversation history
-    history = sessions.setdefault(session_id, [])
+    # Get conversation history from persistent store
+    history = session_store.get(session_id)
 
     # Build input: history + new user message
     input_messages = history + [{"role": "user", "content": req.message}]
@@ -160,7 +161,8 @@ async def chat(req: ChatRequest):
 
     # Extract response and update session
     try:
-        sessions[session_id] = result.to_input_list()
+        new_history = result.to_input_list()
+        session_store.save(session_id, new_history)
         reply = result.final_output or "ขออภัย ไม่สามารถสร้างคำตอบได้ กรุณาลองใหม่"
     except Exception:
         traceback.print_exc()
@@ -169,7 +171,7 @@ async def chat(req: ChatRequest):
     return ChatResponse(
         session_id=session_id,
         response=reply,
-        memory_count=len(sessions[session_id]),
+        memory_count=session_store.count(session_id),
     )
 
 
