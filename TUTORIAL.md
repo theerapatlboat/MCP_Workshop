@@ -18,11 +18,12 @@
 12. [Tools ทั้ง 16 ตัว](#12-tools-ทั้ง-16-ตัว)
 13. [CLI Agent — ใช้งานผ่าน Terminal](#13-cli-agent--ใช้งานผ่าน-terminal)
 14. [ระบบ Tracing](#14-ระบบ-tracing)
-15. [Concepts สำคัญ](#15-concepts-สำคัญ)
-16. [ทดสอบ MCP Server ด้วย MCP Inspector](#16-ทดสอบ-mcp-server-ด้วย-mcp-inspector)
-17. [Logging](#17-logging)
-18. [Deploy ขึ้น Production](#18-deploy-ขึ้น-production)
-19. [Troubleshooting](#19-troubleshooting)
+15. [Vector Search REPL — ค้นหาเอกสารด้วย AI](#15-vector-search-repl--ค้นหาเอกสารด้วย-ai)
+16. [Concepts สำคัญ](#16-concepts-สำคัญ)
+17. [ทดสอบ MCP Server ด้วย MCP Inspector](#17-ทดสอบ-mcp-server-ด้วย-mcp-inspector)
+18. [Logging](#18-logging)
+19. [Deploy ขึ้น Production](#19-deploy-ขึ้น-production)
+20. [Troubleshooting](#20-troubleshooting)
 
 ---
 
@@ -70,6 +71,7 @@
 | **Webhook** | 8001 | `webhook/main.py` | รับ/ส่งข้อความกับ Facebook Messenger |
 | **Agent API** | 3000 | `agent/agent_api.py` | AI Agent ที่ประมวลผลข้อความและตัดสินใจเรียก tools |
 | **CLI Agent** | — | `agent/run_agents.py` | Agent แบบ interactive CLI สำหรับทดสอบใน terminal |
+| **Vector Search** | — | `agent/vector_search.py` | Interactive REPL สำหรับเก็บและค้นหาเอกสารด้วย semantic search |
 
 ### Tools ที่ Agent ใช้ได้ (16 tools)
 
@@ -131,6 +133,8 @@ uv pip install -r requirements.txt
 | `uvicorn` | ASGI server สำหรับ FastAPI |
 | `pydantic` | Data validation |
 | `python-dotenv` | โหลด `.env` |
+| `faiss-cpu` | Facebook AI Similarity Search — vector search engine |
+| `prompt_toolkit` | Interactive REPL — autocomplete, history, colored prompt |
 
 ---
 
@@ -427,7 +431,8 @@ AI-Workshop/
 │
 ├── agent/                        # AI Agent
 │   ├── run_agents.py             # CLI version (สำหรับทดสอบใน terminal)
-│   └── agent_api.py              # API version — port 3000 (สำหรับ webhook/frontend)
+│   ├── agent_api.py              # API version — port 3000 (สำหรับ webhook/frontend)
+│   └── vector_search.py          # Semantic search REPL (OpenAI Embeddings + FAISS + SQLite)
 │
 └── webhook/                      # Facebook Webhook — port 8001
     ├── main.py                   # FastAPI webhook server
@@ -675,7 +680,167 @@ CLI Agent มี ConsoleTraceProcessor แสดง trace ใน terminal (stder
 
 ---
 
-## 15. Concepts สำคัญ
+## 15. Vector Search REPL — ค้นหาเอกสารด้วย AI
+
+Interactive REPL สำหรับเก็บและค้นหาเอกสารด้วย **Semantic Search** — ค้นหาตามความหมาย ไม่ใช่แค่คำตรงตัว พร้อม autocomplete, command history, และ colored prompt ด้วย `prompt_toolkit`
+
+### สถาปัตยกรรม
+
+```
+คำสั่ง add:
+  ข้อความ → OpenAI Embedding API → เก็บใน SQLite (text + vector)
+
+คำสั่ง search:
+  คำค้นหา → OpenAI Embedding API → ค้นหาด้วย FAISS → แสดงผลจาก SQLite
+```
+
+| เทคโนโลยี | หน้าที่ |
+|-----------|---------|
+| **OpenAI `text-embedding-3-small`** | แปลงข้อความเป็น vector 1536 มิติ |
+| **FAISS (Facebook AI Similarity Search)** | ค้นหา vector ที่ใกล้เคียงที่สุดแบบ cosine similarity |
+| **SQLite** | เก็บข้อความต้นฉบับและ embedding ลงไฟล์ `agent/vector_store.db` |
+| **prompt_toolkit** | Interactive REPL พร้อม autocomplete, history, colored prompt |
+
+### ติดตั้ง
+
+```bash
+pip install -r requirements.txt
+```
+
+> `faiss-cpu` และ `prompt_toolkit` อยู่ใน `requirements.txt` แล้ว
+
+### วิธีใช้งาน
+
+**เปิด REPL:**
+
+```bash
+python agent/vector_search.py
+```
+
+**ตัวอย่าง session:**
+
+```
+  +==================================================+
+  |  Vector Search -- Semantic Search with FAISS      |
+  |  Model: text-embedding-3-small                   |
+  |  DB: vector_store.db                             |
+  |  Documents: 0                                    |
+  +==================================================+
+
+  Type 'help' for commands, 'quit' to exit.
+
+vector> add Machine learning is a subset of AI
+  Stored document 1 (40 chars)
+
+vector> add Python is great for data science
+  Stored document 2 (33 chars)
+
+vector> add The quick brown fox jumps over the lazy dog
+  Stored document 3 (43 chars)
+
+vector> search AI and deep learning
+
+  Results for: "AI and deep learning"
+  ================================================
+
+  [1] (score: 0.4849)  ID: 1
+      Added: 2026-02-12T07:49:23+00:00
+      Machine learning is a subset of AI
+
+  [2] (score: 0.3066)  ID: 2
+      Added: 2026-02-12T07:49:23+00:00
+      Python is great for data science
+
+vector> search animals /2
+
+  Results for: "animals"
+  ================================================
+
+  [1] (score: 0.3115)  ID: 3
+      Added: 2026-02-12T07:49:24+00:00
+      The quick brown fox jumps over the lazy dog
+
+  [2] (score: 0.1772)  ID: 1
+      Added: 2026-02-12T07:49:23+00:00
+      Machine learning is a subset of AI
+
+vector> list
+
+  Documents (3 total):
+    [1] Machine learning is a subset of AI (2026-02-12)
+    [2] Python is great for data science (2026-02-12)
+    [3] The quick brown fox jumps over the lazy dog (2026-02-12)
+
+vector> count
+  3 documents in store
+
+vector> quit
+  Goodbye!
+```
+
+### ฟีเจอร์ REPL
+
+| ฟีเจอร์ | คำอธิบาย |
+|---------|----------|
+| **Autocomplete** | กด Tab เพื่อเติมคำสั่ง (add, search, list, count, help, quit) |
+| **Command History** | กดลูกศรขึ้น/ลงเพื่อเรียกคำสั่งก่อนหน้า |
+| **Colored Prompt** | prompt `vector>` แสดงสีฟ้า (cyan) |
+| **Ctrl+C / Ctrl+D** | ออกจากโปรแกรมได้ทุกเมื่อ |
+
+### คำสั่งทั้งหมด
+
+| คำสั่ง | คำอธิบาย | ตัวอย่าง |
+|--------|----------|----------|
+| `add <text>` | เพิ่มเอกสารลง vector store | `add ข้อความที่ต้องการเก็บ` |
+| `search <query>` | ค้นหาเอกสารที่คล้ายกัน (top 5) | `search คำค้นหา` |
+| `search <query> /N` | กำหนดจำนวนผลลัพธ์ | `search AI /3` |
+| `list` | แสดงเอกสารทั้งหมดในฐานข้อมูล | `list` |
+| `count` | แสดงจำนวนเอกสาร | `count` |
+| `help` | แสดงรายการคำสั่ง | `help` |
+| `quit` / `exit` / `q` | ออกจากโปรแกรม | `quit` |
+
+### โครงสร้างโค้ด (`agent/vector_search.py`)
+
+| ส่วน | ฟังก์ชัน | หน้าที่ |
+|------|---------|---------|
+| **SQLite Layer** | `init_db()` | สร้าง/เปิดฐานข้อมูล SQLite |
+| | `store_document()` | บันทึกข้อความ + embedding |
+| | `load_all_embeddings()` | โหลด embeddings ทั้งหมดสำหรับสร้าง index |
+| | `get_documents_by_ids()` | ดึงข้อความจาก ID |
+| | `get_document_count()` | นับจำนวนเอกสาร |
+| | `get_all_documents()` | ดึงเอกสารทั้งหมด |
+| **Embedding Layer** | `get_embedding()` | เรียก OpenAI API แปลงข้อความเป็น vector |
+| **FAISS Layer** | `build_faiss_index()` | สร้าง FAISS index จาก embeddings |
+| **Commands** | `cmd_add()` | จัดการคำสั่ง add |
+| | `cmd_search()` | จัดการคำสั่ง search |
+| | `cmd_list()` | จัดการคำสั่ง list |
+| | `cmd_count()` | จัดการคำสั่ง count |
+| | `show_help()` | แสดงรายการคำสั่ง |
+| **REPL** | `show_banner()` | แสดง banner ตอนเริ่มต้น |
+| | `repl()` | Interactive loop พร้อม prompt_toolkit |
+
+### หลักการทำงาน
+
+1. **Embedding** — ข้อความถูกแปลงเป็น vector 1536 มิติด้วย OpenAI `text-embedding-3-small` ข้อความที่มีความหมายคล้ายกันจะได้ vector ที่ชี้ไปทิศทางเดียวกัน
+
+2. **FAISS Index** — สร้าง index แบบ `IndexFlatIP` (Inner Product) ทุกครั้งที่รัน search โดยโหลด embeddings จาก SQLite แล้ว normalize ด้วย L2 ทำให้ inner product เทียบเท่า cosine similarity
+
+3. **SQLite Persistence** — ข้อมูลทั้งหมดเก็บใน `agent/vector_store.db` ประกอบด้วย:
+   - `id` — รหัสเอกสาร (auto increment)
+   - `text` — ข้อความต้นฉบับ
+   - `embedding` — vector เก็บเป็น BLOB (6,144 bytes ต่อเอกสาร)
+   - `created_at` — วันเวลาที่เพิ่ม
+
+### หมายเหตุ
+
+- ต้องมี `OPENAI_API_KEY` ใน `.env` (ใช้ key เดียวกับ Agent)
+- ไฟล์ `vector_store.db` สร้างอัตโนมัติเมื่อรัน `add` ครั้งแรก
+- Score ยิ่งสูง = ยิ่งตรงกับคำค้นหา (0.0 ถึง 1.0)
+- รองรับทุกภาษาที่ OpenAI embedding รองรับ (ไทย, อังกฤษ, จีน, ญี่ปุ่น ฯลฯ)
+
+---
+
+## 16. Concepts สำคัญ
 
 ### Agent Loop (วงจรการทำงานของ Agent)
 
@@ -722,7 +887,7 @@ Agent ไม่ได้เรียก GoSaaS API โดยตรง แต่�
 
 ---
 
-## 16. ทดสอบ MCP Server ด้วย MCP Inspector
+## 17. ทดสอบ MCP Server ด้วย MCP Inspector
 
 [MCP Inspector](https://github.com/modelcontextprotocol/inspector) เป็น Web UI สำหรับทดสอบและ debug MCP Server โดยไม่ต้องเขียน client code
 
@@ -779,7 +944,7 @@ CLIENT_PORT=8080 SERVER_PORT=9000 npx @modelcontextprotocol/inspector
 
 ---
 
-## 17. Logging
+## 18. Logging
 
 Webhook บันทึก log ทั้ง console และไฟล์:
 
@@ -808,7 +973,7 @@ tail -f webhook/logs/webhook.log
 
 ---
 
-## 18. Deploy ขึ้น Production
+## 19. Deploy ขึ้น Production
 
 ตอน deploy จริงไม่ต้องใช้ ngrok ใช้ server ที่มี domain + SSL แทน
 
@@ -848,7 +1013,7 @@ services:
 
 ---
 
-## 19. Troubleshooting
+## 20. Troubleshooting
 
 | ปัญหา | วิธีแก้ |
 |-------|---------|

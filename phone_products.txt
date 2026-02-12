@@ -1,0 +1,101 @@
+id|name|sku|price|stock|color|model|screen_size
+001|iPhone 16 Pro Max|IPH-16PM-BLK-256|52900|15|ดำไทเทเนียม|iPhone 16 Pro Max|6.9
+002|iPhone 16 Pro Max|IPH-16PM-WHT-256|52900|10|ขาวไทเทเนียม|iPhone 16 Pro Max|6.9
+003|iPhone 16 Pro Max|IPH-16PM-NAT-512|58900|8|เนเชอรัลไทเทเนียม|iPhone 16 Pro Max|6.9
+004|iPhone 16 Pro Max|IPH-16PM-DST-1TB|67900|3|ทรายทะเลทราย|iPhone 16 Pro Max|6.9
+005|iPhone 16 Pro|IPH-16P-BLK-128|44900|20|ดำไทเทเนียม|iPhone 16 Pro|6.3
+006|iPhone 16 Pro|IPH-16P-WHT-256|48900|12|ขาวไทเทเนียม|iPhone 16 Pro|6.3
+007|iPhone 16 Pro|IPH-16P-NAT-256|48900|9|เนเชอรัลไทเทเนียม|iPhone 16 Pro|6.3
+008|iPhone 16 Pro|IPH-16P-DST-512|54900|5|ทรายทะเลทราย|iPhone 16 Pro|6.3
+009|iPhone 16|IPH-16-BLK-128|32900|25|ดำ|iPhone 16|6.1
+010|iPhone 16|IPH-16-WHT-128|32900|18|ขาว|iPhone 16|6.1
+011|iPhone 16|IPH-16-PNK-256|36900|14|ชมพู|iPhone 16|6.1
+012|iPhone 16|IPH-16-BLU-256|36900|11|น้ำเงิน|iPhone 16|6.1
+013|iPhone 16 Plus|IPH-16PL-BLK-128|37900|16|ดำ|iPhone 16 Plus|6.7
+014|iPhone 16 Plus|IPH-16PL-WHT-256|41900|7|ขาว|iPhone 16 Plus|6.7
+015|iPhone 15|IPH-15-BLK-128|26900|30|ดำ|iPhone 15|6.1
+016|iPhone 15|IPH-15-BLU-128|26900|22|น้ำเงิน|iPhone 15|6.1
+017|Samsung Galaxy S25 Ultra|SAM-S25U-BLK-256|47900|18|ดำไทเทเนียม|Galaxy S25 Ultra|6.9
+018|Samsung Galaxy S25 Ultra|SAM-S25U-GRY-256|47900|14|เทาไทเทเนียม|Galaxy S25 Ultra|6.9
+019|Samsung Galaxy S25 Ultra|SAM-S25U-BLU-512|53900|6|น้ำเงินไทเทเนียม|Galaxy S25 Ultra|6.9
+020|Samsung Galaxy S25 Ultra|SAM-S25U-SLV-1TB|61900|2|เงินไทเทเนียม|Galaxy S25 Ultra|6.9
+021|Samsung Galaxy S25+|SAM-S25P-NVY-256|37900|20|กรมท่า|Galaxy S25+|6.7
+022|Samsung Galaxy S25+|SAM-S25P-SLV-256|37900|15|เงิน|Galaxy S25+|6.7
+023|Samsung Galaxy S25+|SAM-S25P-GRN-512|42900|8|เขียวมิ้นท์|Galaxy S25+|6.7
+024|Samsung Galaxy S25|SAM-S25-NVY-128|31900|25|กรมท่า|Galaxy S25|6.2
+025|Samsung Galaxy S25|SAM-S25-SLV-128|31900|19|เงิน|Galaxy S25|6.2
+026|Samsung Galaxy S25|SAM-S25-BLU-256|35900|12|น้ำเงินน้ำแข็ง|Galaxy S25|6.2
+027|Samsung Galaxy S24 FE|SAM-S24FE-BLU-128|22900|28|น้ำเงิน|Galaxy S24 FE|6.7
+028|Samsung Galaxy S24 FE|SAM-S24FE-GRN-128|22900|20|เขียว|Galaxy S24 FE|6.7
+029|Samsung Galaxy S24 FE|SAM-S24FE-GRY-256|25900|10|เทา|Galaxy S24 FE|6.7
+030|Samsung Galaxy A56|SAM-A56-BLK-128|14900|35|ดำ|Galaxy A56|6.7
+031|Samsung Galaxy A56|SAM-A56-BLU-128|14900|30|น้ำเงิน|Galaxy A56|6.7
+032|Samsung Galaxy A56|SAM-A56-LVD-256|16900|18|ม่วงลาเวนเดอร์|Galaxy A56|6.7
+033|Samsung Galaxy A36|SAM-A36-BLK-128|10900|40|ดำ|Galaxy A36|6.6
+034|Samsung Galaxy A36|SAM-A36-BLU-128|10900|32|น้ำเงิน|Galaxy A36|6.6
+035|Samsung Galaxy A16|SAM-A16-BLK-64|6490|50|ดำ|Galaxy A16|6.5
+036|Samsung Galaxy A16|SAM-A16-GRN-128|7490|38|เขียว|Galaxy A16|6.5
+037|OPPO Find X8 Pro|OPP-FX8P-BLK-256|36990|10|ดำ|Find X8 Pro|6.78
+038|OPPO Find X8 Pro|OPP-FX8P-WHT-256|36990|8|ขาวมุก|Find X8 Pro|6.78
+039|OPPO Find X8|OPP-FX8-BLK-256|29990|14|ดำ|Find X8|6.59
+040|OPPO Find X8|OPP-FX8-BLU-256|29990|11|น้ำเงิน|Find X8|6.59
+041|OPPO Reno 12 Pro|OPP-R12P-SLV-256|16990|22|เงิน|Reno 12 Pro|6.7
+042|OPPO Reno 12 Pro|OPP-R12P-GLD-256|16990|17|ทอง|Reno 12 Pro|6.7
+043|OPPO Reno 12|OPP-R12-BLK-256|13990|28|ดำ|Reno 12|6.7
+044|OPPO Reno 12|OPP-R12-GRN-256|13990|20|เขียว|Reno 12|6.7
+045|OPPO A3 Pro|OPP-A3P-BLK-128|8990|35|ดำ|A3 Pro|6.67
+046|OPPO A3 Pro|OPP-A3P-PRP-128|8990|25|ม่วง|A3 Pro|6.67
+047|OPPO A3|OPP-A3-BLK-128|6990|42|ดำ|A3|6.67
+048|OPPO A3|OPP-A3-BLU-128|6990|30|น้ำเงิน|A3|6.67
+049|Xiaomi 15 Ultra|XIA-15U-BLK-512|39990|8|ดำ|Xiaomi 15 Ultra|6.73
+050|Xiaomi 15 Ultra|XIA-15U-WHT-512|39990|5|ขาว|Xiaomi 15 Ultra|6.73
+051|Xiaomi 15 Pro|XIA-15P-BLK-256|29990|12|ดำ|Xiaomi 15 Pro|6.73
+052|Xiaomi 15 Pro|XIA-15P-GRN-256|29990|9|เขียว|Xiaomi 15 Pro|6.73
+053|Xiaomi 15|XIA-15-BLK-256|24990|18|ดำ|Xiaomi 15|6.36
+054|Xiaomi 15|XIA-15-WHT-256|24990|14|ขาว|Xiaomi 15|6.36
+055|Xiaomi 15|XIA-15-PRP-256|24990|10|ม่วง|Xiaomi 15|6.36
+056|Xiaomi 14T Pro|XIA-14TP-BLK-256|18990|20|ดำ|Xiaomi 14T Pro|6.67
+057|Xiaomi 14T Pro|XIA-14TP-BLU-256|18990|15|น้ำเงิน|Xiaomi 14T Pro|6.67
+058|Xiaomi 14T|XIA-14T-GRY-256|15990|22|เทา|Xiaomi 14T|6.67
+059|Xiaomi 14T|XIA-14T-BLU-256|15990|18|น้ำเงิน|Xiaomi 14T|6.67
+060|Redmi Note 14 Pro+|XIA-RN14PP-BLK-256|11990|30|ดำ|Redmi Note 14 Pro+|6.67
+061|Redmi Note 14 Pro+|XIA-RN14PP-PRP-256|11990|24|ม่วง|Redmi Note 14 Pro+|6.67
+062|Redmi Note 14 Pro|XIA-RN14P-BLK-128|8990|35|ดำ|Redmi Note 14 Pro|6.67
+063|Redmi Note 14 Pro|XIA-RN14P-GRN-128|8990|28|เขียว|Redmi Note 14 Pro|6.67
+064|Redmi Note 14|XIA-RN14-BLK-128|6490|45|ดำ|Redmi Note 14|6.67
+065|Redmi Note 14|XIA-RN14-BLU-128|6490|38|น้ำเงิน|Redmi Note 14|6.67
+066|vivo X200 Pro|VIV-X200P-BLK-256|34990|10|ดำ|X200 Pro|6.78
+067|vivo X200 Pro|VIV-X200P-BLU-256|34990|7|น้ำเงิน|X200 Pro|6.78
+068|vivo X200|VIV-X200-BLK-256|24990|15|ดำ|X200|6.67
+069|vivo X200|VIV-X200-GRN-256|24990|11|เขียว|X200|6.67
+070|vivo V40|VIV-V40-PRP-256|14990|20|ม่วง|V40|6.78
+071|vivo V40|VIV-V40-SLV-256|14990|16|เงิน|V40|6.78
+072|vivo V40 Lite|VIV-V40L-BLK-128|9990|30|ดำ|V40 Lite|6.67
+073|vivo V40 Lite|VIV-V40L-GLD-128|9990|22|ทอง|V40 Lite|6.67
+074|vivo Y28s|VIV-Y28S-BLK-128|5990|40|ดำ|Y28s|6.56
+075|vivo Y28s|VIV-Y28S-GRN-128|5990|35|เขียว|Y28s|6.56
+076|Google Pixel 9 Pro XL|PIX-9PXL-BLK-256|44900|6|ออบซิเดียน|Pixel 9 Pro XL|6.8
+077|Google Pixel 9 Pro XL|PIX-9PXL-PRC-256|44900|4|พอร์เซเลน|Pixel 9 Pro XL|6.8
+078|Google Pixel 9 Pro|PIX-9P-BLK-128|37900|8|ออบซิเดียน|Pixel 9 Pro|6.3
+079|Google Pixel 9 Pro|PIX-9P-RSE-128|37900|5|โรสควอตซ์|Pixel 9 Pro|6.3
+080|Google Pixel 9|PIX-9-BLK-128|27900|12|ออบซิเดียน|Pixel 9|6.3
+081|Google Pixel 9|PIX-9-MNT-128|27900|9|มินท์|Pixel 9|6.3
+082|Google Pixel 9a|PIX-9A-BLK-128|17900|20|ดำ|Pixel 9a|6.3
+083|Google Pixel 9a|PIX-9A-GRN-128|17900|15|เขียว|Pixel 9a|6.3
+084|Nothing Phone (2a) Plus|NTH-2AP-GRY-256|14990|12|เทา|Phone (2a) Plus|6.7
+085|Nothing Phone (2a) Plus|NTH-2AP-BLK-256|14990|8|ดำ|Phone (2a) Plus|6.7
+086|Nothing Phone (2a)|NTH-2A-BLK-128|10990|18|ดำ|Phone (2a)|6.7
+087|Nothing Phone (2a)|NTH-2A-WHT-128|10990|14|ขาว|Phone (2a)|6.7
+088|Huawei Pura 70 Ultra|HUA-P70U-BLK-512|42900|4|ดำ|Pura 70 Ultra|6.8
+089|Huawei Pura 70 Ultra|HUA-P70U-GRN-512|42900|3|เขียว|Pura 70 Ultra|6.8
+090|Huawei Pura 70 Pro|HUA-P70P-BLK-256|34900|7|ดำ|Pura 70 Pro|6.8
+091|Huawei Pura 70 Pro|HUA-P70P-GLD-256|34900|5|ทอง|Pura 70 Pro|6.8
+092|HONOR Magic7 Pro|HON-M7P-BLK-256|27990|10|ดำ|Magic7 Pro|6.8
+093|HONOR Magic7 Pro|HON-M7P-GRN-256|27990|8|เขียว|Magic7 Pro|6.8
+094|HONOR 200 Pro|HON-200P-BLK-256|17990|16|ดำ|HONOR 200 Pro|6.78
+095|HONOR 200 Pro|HON-200P-BLU-256|17990|12|น้ำเงิน|HONOR 200 Pro|6.78
+096|realme GT 7 Pro|RLM-GT7P-BLK-256|21990|14|ดำ|GT 7 Pro|6.78
+097|realme GT 7 Pro|RLM-GT7P-GRN-256|21990|10|เขียว|GT 7 Pro|6.78
+098|realme 13 Pro+|RLM-13PP-PRP-256|13990|20|ม่วง|realme 13 Pro+|6.7
+099|realme 13 Pro+|RLM-13PP-GLD-256|13990|15|ทอง|realme 13 Pro+|6.7
+100|realme 13 Pro|RLM-13P-BLU-128|11990|25|น้ำเงิน|realme 13 Pro|6.7
