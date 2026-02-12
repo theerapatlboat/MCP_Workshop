@@ -12,7 +12,13 @@ UUM8CSQEWK
 BE4EE4TECV
 ```
 
-ื# Ngrok
+# Ngrok
 ```
 https://zaida-untrampled-overgreatly.ngrok-free.dev/webhook
 ```
+
+# Memory
+- add
+- get
+- get all
+- delete 
