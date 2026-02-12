@@ -437,10 +437,10 @@ class AgentTuiApp(App):
             ltm_log.clear()
             ltm_log.write(Text(f"Error fetching LTM: {e}", style="red"))
 
-    def _refresh_sessions(self) -> None:
+    async def _refresh_sessions(self) -> None:
         """Refresh the Session tab with all sessions."""
         session_list = self.query_one("#session-list", ListView)
-        session_list.clear()
+        await session_list.clear()
         sessions = self._session_store.list_all()
 
         for s in sessions:
