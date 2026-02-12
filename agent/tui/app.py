@@ -9,12 +9,11 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-import httpx
 from rich.text import Text
 from textual import work, on
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual.widgets import (
     Header,
@@ -33,6 +32,30 @@ from textual.widgets import (
 from agents import Agent, Runner, trace, set_trace_processors
 from agents.mcp import MCPServerStreamableHttp
 from openai.types.responses import ResponseTextDeltaEvent
+
+
+def _extract_text(content) -> str:
+    """Extract plain text from message content.
+
+    The OpenAI Agents SDK to_input_list() returns assistant content as a list
+    of content blocks like [{"type": "output_text", "text": "..."}].
+    This helper normalises that to a plain string.
+    """
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict):
+                if item.get("type") == "output_text" and "text" in item:
+                    parts.append(item["text"])
+                elif "text" in item:
+                    parts.append(item["text"])
+            elif isinstance(item, str):
+                parts.append(item)
+        return "".join(parts)
+    return str(content) if content else ""
+
 
 # Ensure parent dir is on path for session_store import
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -121,50 +144,27 @@ class AgentTuiApp(App):
     def compose(self) -> ComposeResult:
         yield Header()
         with Horizontal(id="main-body"):
-            with VerticalScroll(id="chat-panel"):
-                yield RichLog(id="chat-log", auto_scroll=True, markup=True, wrap=True)
+            with Vertical(id="chat-panel"):
+                yield RichLog(id="chat-log", auto_scroll=True, markup=False, highlight=False)
             with Vertical(id="right-panel"):
                 with TabbedContent(id="tabs"):
                     with TabPane("Replies", id="tab-replies"):
-                        yield RichLog(
-                            id="reply-log", auto_scroll=True, markup=True, wrap=True
-                        )
+                        yield RichLog(id="reply-log", auto_scroll=True, markup=False, highlight=False)
                     with TabPane("Traces", id="tab-traces"):
-                        yield RichLog(
-                            id="trace-log", auto_scroll=True, markup=True, wrap=True
-                        )
+                        yield RichLog(id="trace-log", auto_scroll=True, markup=False, highlight=False)
                     with TabPane("STM", id="tab-stm"):
-                        yield RichLog(
-                            id="stm-log", auto_scroll=True, markup=True, wrap=True
-                        )
+                        yield RichLog(id="stm-log", auto_scroll=True, markup=False, highlight=False)
                     with TabPane("LTM", id="tab-ltm"):
                         with Vertical():
                             with Horizontal(id="ltm-controls"):
-                                yield Input(
-                                    id="ltm-user-id",
-                                    placeholder="user_id",
-                                    value="cli",
-                                )
-                                yield Button(
-                                    "Refresh", id="ltm-refresh", variant="default"
-                                )
-                            yield RichLog(
-                                id="ltm-log",
-                                auto_scroll=True,
-                                markup=True,
-                                wrap=True,
-                            )
+                                yield Input(id="ltm-user-id", placeholder="user_id", value="cli")
+                                yield Button("Refresh", id="ltm-refresh", variant="default")
+                            yield RichLog(id="ltm-log", auto_scroll=True, markup=False, highlight=False)
                     with TabPane("Session", id="tab-session"):
                         with Vertical():
-                            yield Button(
-                                "Refresh Sessions",
-                                id="session-refresh",
-                                variant="default",
-                            )
+                            yield Button("Refresh Sessions", id="session-refresh", variant="default")
                             yield ListView(id="session-list")
-                            yield Static(
-                                f"Current: {self._session_id}", id="session-info"
-                            )
+                            yield Static(f"Current: {self._session_id}", id="session-info")
         with Horizontal(id="input-bar"):
             yield Input(id="user-input", placeholder="Type your message...")
             yield Button("Send", id="send-btn", variant="primary")
@@ -322,7 +322,7 @@ class AgentTuiApp(App):
         self._current_reply += event.delta
         # Append delta to reply log
         reply_log = self.query_one("#reply-log", RichLog)
-        reply_log.write(event.delta)
+        reply_log.write(Text(event.delta, style="green"))
 
     def on_stream_complete(self, event: StreamComplete) -> None:
         self._is_streaming = False
@@ -337,7 +337,7 @@ class AgentTuiApp(App):
         reply_log.clear()
         reply_log.write(Text(f"Reply #{self._reply_counter}", style="bold"))
         reply_log.write("")
-        reply_log.write(event.full_reply)
+        reply_log.write(Text(event.full_reply, style="green"))
 
         # Refresh STM
         self._refresh_stm()
@@ -374,10 +374,7 @@ class AgentTuiApp(App):
         )
         for msg in history:
             role = msg.get("role", "?")
-            content = msg.get("content", "")
-            if isinstance(content, list):
-                # tool_call / tool_result messages
-                content = json.dumps(content, ensure_ascii=False)
+            content = _extract_text(msg.get("content", ""))
             if not content:
                 continue
             if len(content) > 300:
@@ -387,64 +384,54 @@ class AgentTuiApp(App):
 
     @work(exclusive=False)
     async def _refresh_ltm(self) -> None:
-        """Fetch long-term memories from MCP server."""
+        """Fetch long-term memories via the connected MCP server."""
         user_id = self.query_one("#ltm-user-id", Input).value or "cli"
         ltm_log = self.query_one("#ltm-log", RichLog)
         ltm_log.clear()
         ltm_log.write(Text("Loading memories...", style="dim"))
 
+        if not self._mcp_server:
+            ltm_log.clear()
+            ltm_log.write(Text("MCP server not connected", style="red"))
+            return
+
         try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                resp = await client.post(
-                    self._mcp_url,
-                    json={
-                        "jsonrpc": "2.0",
-                        "method": "tools/call",
-                        "params": {
-                            "name": "memory_get_all",
-                            "arguments": {"user_id": user_id},
-                        },
-                        "id": 1,
-                    },
-                    headers={"Content-Type": "application/json"},
+            result = await self._mcp_server.call_tool(
+                "memory_get_all", {"user_id": user_id}
+            )
+
+            # Parse CallToolResult.content → TextContent.text → JSON
+            items = []
+            for block in result.content:
+                if hasattr(block, "text") and block.text:
+                    try:
+                        parsed = json.loads(block.text)
+                        memories = parsed.get("memories", parsed)
+                        if isinstance(memories, dict):
+                            items = memories.get("results", [])
+                        elif isinstance(memories, list):
+                            items = memories
+                    except json.JSONDecodeError:
+                        pass
+
+            ltm_log.clear()
+            if not items:
+                ltm_log.write(
+                    Text(f"No memories found for user: {user_id}", style="dim")
                 )
-                data = resp.json()
-                result = data.get("result", {})
-
-                # Parse MCP tool response
-                items = []
-                if isinstance(result, dict) and "content" in result:
-                    content = result["content"]
-                    if isinstance(content, list) and content:
-                        text_content = content[0].get("text", "{}")
-                        try:
-                            parsed = json.loads(text_content)
-                            memories = parsed.get("memories", parsed)
-                            if isinstance(memories, dict):
-                                items = memories.get("results", [])
-                            elif isinstance(memories, list):
-                                items = memories
-                        except json.JSONDecodeError:
-                            items = []
-
-                ltm_log.clear()
-                if not items:
-                    ltm_log.write(
-                        Text(f"No memories found for user: {user_id}", style="dim")
+            else:
+                ltm_log.write(
+                    Text(
+                        f"Memories for user: {user_id} ({len(items)} total)",
+                        style="bold",
                     )
-                else:
-                    ltm_log.write(
-                        Text(
-                            f"Memories for user: {user_id} ({len(items)} total)",
-                            style="bold",
-                        )
-                    )
-                    ltm_log.write("")
-                    for i, mem in enumerate(items, 1):
-                        mem_text = mem.get("memory", str(mem))
-                        mem_id = str(mem.get("id", "?"))[:12]
-                        ltm_log.write(Text(f"  {i}. {mem_text}", style="white"))
-                        ltm_log.write(Text(f"     id: {mem_id}...", style="dim"))
+                )
+                ltm_log.write("")
+                for i, mem in enumerate(items, 1):
+                    mem_text = mem.get("memory", str(mem))
+                    mem_id = str(mem.get("id", "?"))[:12]
+                    ltm_log.write(Text(f"  {i}. {mem_text}", style="white"))
+                    ltm_log.write(Text(f"     id: {mem_id}...", style="dim"))
 
         except Exception as e:
             ltm_log.clear()
@@ -512,9 +499,9 @@ class AgentTuiApp(App):
         chat_log.clear()
         for msg in self._history:
             role = msg.get("role", "?")
-            content = msg.get("content", "")
-            if isinstance(content, list):
-                continue  # Skip tool_call/tool_result in chat view
+            if role not in ("user", "assistant"):
+                continue
+            content = _extract_text(msg.get("content", ""))
             if not content:
                 continue
             style = {"user": "bold cyan", "assistant": "green"}.get(role, "dim")

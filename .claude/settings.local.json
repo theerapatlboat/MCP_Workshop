@@ -38,7 +38,12 @@
       "Bash(where:*)",
       "Bash(wc:*)",
       "Bash(echo:*)",
-      "Bash(set PYTHONIOENCODING=utf-8:*)"
+      "Bash(set PYTHONIOENCODING=utf-8:*)",
+      "WebFetch(domain:docs.mem0.ai)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:textual.textualize.io)",
+      "WebFetch(domain:realpython.com)",
+      "Bash(ls:*)"
     ]
   }
 }
