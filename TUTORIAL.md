@@ -5,6 +5,7 @@
 ระบบประกอบด้วย 2 ส่วนหลัก:
 
 ```
+agent/                                                  mcp-server/
 ┌─────────────────────┐     MCP (Streamable HTTP)     ┌─────────────────────┐
 │   run_agents.py     │ ────────────────────────────▶ │    server.py        │
 │   (OpenAI Agents)   │ ◀──────────────────────────── │    (MCP Server)     │
@@ -14,10 +15,32 @@
      CLI Input/Output                                   GoSaaS OPEN-API (UAT)
 ```
 
+```
+├── agent/
+│   └── run_agents.py          # Agent CLI — OpenAI Agents SDK
+├── mcp-server/
+│   ├── server.py              # MCP Server — entry point
+│   ├── config.py              # Shared config, API helpers, OpenAI client
+│   ├── models.py              # Pydantic models (AddressVerificationResult)
+│   └── tools/
+│       ├── __init__.py
+│       ├── order_draft.py     # Order draft CRUD + payment
+│       ├── product.py         # Product list / get
+│       ├── shipment.py        # Shipping status / shipment details
+│       ├── report.py          # Sales summary / filters
+│       ├── order.py           # Order metadata (WIP)
+│       └── utilities.py       # verify_address, faq, intent_classify
+├── .env                       # API keys (OpenAI, GoSaaS UAT)
+└── requirements.txt           # Dependencies
+```
+
 | ไฟล์ | หน้าที่ |
 |------|---------|
-| `server.py` | MCP Server — เปิด 16 tools ผ่านโปรโตคอล MCP |
-| `run_agents.py` | Agent CLI — เชื่อมต่อ MCP, สร้าง Agent, รับ input, streaming + tracing |
+| `mcp-server/server.py` | MCP Server — เปิด 16 tools ผ่านโปรโตคอล MCP |
+| `mcp-server/config.py` | Shared config — API helpers, HTTP client, OpenAI client |
+| `mcp-server/models.py` | Pydantic models ที่ใช้ร่วมกันระหว่าง tools |
+| `mcp-server/tools/` | Tool modules แยกตามหมวดหมู่ (order, product, shipment, report, utilities) |
+| `agent/run_agents.py` | Agent CLI — เชื่อมต่อ MCP, สร้าง Agent, รับ input, streaming + tracing |
 | `.env` | API keys (OpenAI, GoSaaS UAT) |
 | `requirements.txt` | Dependencies |
 
@@ -49,7 +72,7 @@ uv pip install -r requirements.txt
 |---------|----------|
 | `openai-agents` | OpenAI Agents SDK — Agent, Runner, Tracing |
 | `mcp[cli]` | Model Context Protocol — MCP Server |
-| `openai` | OpenAI API (FAQ/Intent ใน server.py) |
+| `openai` | OpenAI API (FAQ/Intent ใน utilities.py) |
 | `httpx` | HTTP client เรียก GoSaaS API |
 | `pydantic` | Data validation |
 | `python-dotenv` | โหลด `.env` |
@@ -80,9 +103,7 @@ UAT_API_URL=https://oapi.uatgosaasapi.co/api/v1
 ### Terminal 1 — MCP Server
 
 ```bash
-python server.py
-# หรือ
-uv run server.py
+python mcp-server/server.py
 ```
 
 Server จะเริ่มที่ `http://localhost:8000/mcp` (transport: `streamable-http`)
@@ -90,7 +111,7 @@ Server จะเริ่มที่ `http://localhost:8000/mcp` (transport: `s
 ### Terminal 2 — Agent CLI
 
 ```bash
-python run_agents.py
+python agent/run_agents.py
 ```
 
 ---
@@ -176,7 +197,7 @@ Tracing แสดงใน terminal (stderr) แบบ real-time พร้อม
 
 ---
 
-## 7. Tools ทั้ง 16 ตัว (จาก server.py)
+## 7. Tools ทั้ง 16 ตัว (จาก mcp-server/tools/)
 
 ### Order Draft
 
@@ -240,7 +261,7 @@ Tracing แสดงใน terminal (stderr) แบบ real-time พร้อม
 **1. เริ่ม server ก่อน** (Terminal 1):
 
 ```bash
-python server.py
+python mcp-server/server.py
 ```
 
 **2. เปิด Inspector** (Terminal 2):
@@ -288,10 +309,10 @@ CLIENT_PORT=8080 SERVER_PORT=9000 npx @modelcontextprotocol/inspector
 
 ---
 
-## 9. โครงสร้างโค้ด run_agents.py
+## 9. โครงสร้างโค้ด agent/run_agents.py
 
 ```
-run_agents.py
+agent/run_agents.py
 ├── ConsoleTraceProcessor     # Custom trace processor แสดง trace ใน terminal
 │   ├── on_trace_start()      # เริ่ม trace
 │   ├── on_trace_end()        # จบ trace
@@ -357,9 +378,9 @@ Agent จะวนลูปจนกว่าจะได้คำตอบส�
 
 ### MCP (Model Context Protocol)
 
-Agent ไม่ได้เรียก GoSaaS API โดยตรง แต่เรียกผ่าน MCP Server (`server.py`) ซึ่งทำหน้าที่เป็นตัวกลาง ข้อดีคือ:
+Agent ไม่ได้เรียก GoSaaS API โดยตรง แต่เรียกผ่าน MCP Server (`mcp-server/server.py`) ซึ่งทำหน้าที่เป็นตัวกลาง ข้อดีคือ:
 - แยก business logic (API calls) ออกจาก Agent logic
-- Tools ถูก define ครั้งเดียวใน server.py แล้ว Agent เห็นอัตโนมัติ
+- Tools ถูก define ครั้งเดียวใน mcp-server/tools/ แล้ว Agent เห็นอัตโนมัติ
 - สามารถใช้ MCP Server เดียวกันกับ Agent หลายตัวได้
 
 ---
@@ -368,11 +389,11 @@ Agent ไม่ได้เรียก GoSaaS API โดยตรง แต่�
 
 | ปัญหา | วิธีแก้ |
 |-------|---------|
-| `Failed to connect to MCP server` | ตรวจสอบว่า `python server.py` รันอยู่ |
+| `Failed to connect to MCP server` | ตรวจสอบว่า `python mcp-server/server.py` รันอยู่ |
 | `OPENAI_API_KEY not set` | ตรวจสอบไฟล์ `.env` ว่ามี key ถูกต้อง |
 | Agent ตอบช้า | เปลี่ยน `AGENT_MODEL` เป็น `gpt-4o-mini` |
 | Tool call ล้มเหลว | ตรวจสอบ `UAT_API_KEY` และ `UAT_API_URL` ใน `.env` |
 | สีไม่แสดงใน terminal | ใช้ terminal ที่รองรับ ANSI colors (Windows Terminal, VS Code) |
-| Inspector ขึ้น "Connection Error" | ตรวจสอบว่า server.py รันอยู่ และ URL ถูกต้อง |
+| Inspector ขึ้น "Connection Error" | ตรวจสอบว่า mcp-server/server.py รันอยู่ และ URL ถูกต้อง |
 | Port 6274 / 6277 ถูกใช้งาน | ใช้ `CLIENT_PORT` / `SERVER_PORT` เปลี่ยน port |
 | Port 8000 ถูกใช้งาน | ปิด process อื่นที่ใช้ port 8000 |
