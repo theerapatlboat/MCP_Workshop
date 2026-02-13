@@ -31,6 +31,7 @@ ALLOWED messages:
 - Greetings, thank you, small talk related to shopping
 - Complaints or returns about purchased products
 - Asking for product recommendations or usage tips
+- Requesting to see product images, photos, or packaging (e.g., "ดูรูปสินค้า", "ขอรูป", "ดึงรูป IMG_PROD")
 - FAQ about the store and services
 - Providing personal info (name, phone, address) for orders
 

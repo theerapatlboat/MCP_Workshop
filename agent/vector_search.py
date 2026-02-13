@@ -182,10 +182,10 @@ def substring_search(
     filters: dict | None = None,
     limit: int = 5,
 ) -> list[dict]:
-    """Search documents by substring match across text, title, category, doc_id."""
+    """Search documents by substring match across text, title, category, doc_id, image_ids."""
     like_param = f"%{query}%"
-    text_match = "(text LIKE ? OR title LIKE ? OR category LIKE ? OR doc_id LIKE ?)"
-    params: list = [like_param] * 4
+    text_match = "(text LIKE ? OR title LIKE ? OR category LIKE ? OR doc_id LIKE ? OR image_ids LIKE ?)"
+    params: list = [like_param] * 5
 
     if filters:
         filter_clauses, filter_params = _build_filter_clauses(filters)
@@ -353,6 +353,20 @@ def hybrid_search(
             doc["score"] = None
             doc["source"] = "substring"
             merged[doc["id"]] = doc
+
+    # ── IMG_* pattern search — extract image IDs from query and search for each ──
+    img_ids_in_query = re.findall(r"IMG_[A-Z]+_\d+", query)
+    for img_id in img_ids_in_query:
+        if img_id == query:
+            continue  # Already covered by the main substring search
+        img_docs = substring_search(conn, img_id, filters=filters, limit=top_k)
+        for doc in img_docs:
+            if doc["id"] in merged:
+                merged[doc["id"]]["source"] = "both"
+            else:
+                doc["score"] = None
+                doc["source"] = "substring"
+                merged[doc["id"]] = doc
 
     # Sort: vector hits first (by score desc), then substring-only
     return sorted(

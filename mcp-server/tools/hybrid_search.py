@@ -13,6 +13,16 @@ from mcp.server.fastmcp import FastMCP
 from config import openai_client
 from agent.vector_search import get_connection, hybrid_search as _hybrid_search
 
+# ---------------------------------------------------------------------------
+# Load image descriptions so the agent knows what each image looks like
+# ---------------------------------------------------------------------------
+_IMAGE_DESCRIPTIONS: dict[str, str] = {}
+_image_mapping_path = Path(__file__).resolve().parent.parent.parent / "storage" / "image_mapping.txt"
+if _image_mapping_path.exists():
+    with open(_image_mapping_path, "r", encoding="utf-8") as _f:
+        _mapping = json.load(_f)
+    _IMAGE_DESCRIPTIONS = {k: v.get("description", "") for k, v in _mapping.items()}
+
 
 def register(mcp: FastMCP) -> None:
 
@@ -201,6 +211,10 @@ def _clean_candidates(candidates: list[dict]) -> list[dict]:
             "title": doc.get("title"),
             "content": doc.get("text"),
             "image_ids": image_ids,
+            "image_details": {
+                img_id: _IMAGE_DESCRIPTIONS.get(img_id, "")
+                for img_id in image_ids
+            } if image_ids else {},
             "score": doc.get("score"),
             "source": doc.get("source"),
         })
