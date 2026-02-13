@@ -1,8 +1,10 @@
+import asyncio
 import hashlib
 import hmac
 import json
 import logging
 import os
+import time
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -35,22 +37,42 @@ LOG_DIR.mkdir(exist_ok=True)
 logger = logging.getLogger("webhook")
 logger.setLevel(logging.INFO)
 
-formatter = logging.Formatter("%(asctime)s | %(levelname)-8s | %(message)s")
+if not logger.handlers:
+    formatter = logging.Formatter("%(asctime)s | %(levelname)-8s | %(message)s")
 
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
 
-file_handler = RotatingFileHandler(
-    LOG_DIR / "webhook.log", maxBytes=5_000_000, backupCount=3, encoding="utf-8"
-)
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
+    file_handler = RotatingFileHandler(
+        LOG_DIR / "webhook.log", maxBytes=5_000_000, backupCount=3, encoding="utf-8"
+    )
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
 
 # ---------------------------------------------------------------------------
 # FastAPI app
 # ---------------------------------------------------------------------------
 app = FastAPI(title="Facebook Messenger Webhook")
+
+# ---------------------------------------------------------------------------
+# Message deduplication (prevents processing Facebook webhook retries)
+# ---------------------------------------------------------------------------
+_seen_mids: dict[str, float] = {}
+_DEDUP_TTL_SECONDS = 300  # 5 minutes
+
+
+def _is_duplicate(mid: str) -> bool:
+    """Return True if this mid was already processed. Auto-cleans expired entries."""
+    now = time.time()
+    if len(_seen_mids) > 100:
+        expired = [k for k, ts in _seen_mids.items() if now - ts > _DEDUP_TTL_SECONDS]
+        for k in expired:
+            del _seen_mids[k]
+    if mid in _seen_mids:
+        return True
+    _seen_mids[mid] = now
+    return False
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -179,6 +201,65 @@ async def verify_webhook(
     raise HTTPException(status_code=403, detail="Verification failed")
 
 
+async def _process_messaging_event(event: dict) -> None:
+    """Process a single messaging event in the background."""
+    try:
+        sender_id = event.get("sender", {}).get("id")
+        recipient_id = event.get("recipient", {}).get("id")
+
+        # Skip echo messages
+        message = event.get("message", {})
+        if message.get("is_echo"):
+            logger.info("Skipping echo message from %s", sender_id)
+            return
+
+        # Deduplicate by message mid
+        mid = message.get("mid")
+        if mid and _is_duplicate(mid):
+            logger.info("Skipping duplicate mid=%s from %s", mid[:30], sender_id)
+            return
+
+        # Text message
+        text = message.get("text")
+        if text:
+            logger.info(
+                "Message from %s to %s: %s", sender_id, recipient_id, text
+            )
+            reply, image_ids = await forward_to_agent(sender_id, text)
+            if reply:
+                await send_message(sender_id, reply)
+            if image_ids:
+                await send_images(sender_id, image_ids)
+
+        # Attachments
+        attachments = message.get("attachments")
+        if attachments:
+            logger.info(
+                "Attachments from %s: %s",
+                sender_id,
+                [a.get("type") for a in attachments],
+            )
+
+        # Postback
+        postback = event.get("postback")
+        if postback:
+            logger.info(
+                "Postback from %s: title=%s payload=%s",
+                sender_id,
+                postback.get("title"),
+                postback.get("payload"),
+            )
+            reply, image_ids = await forward_to_agent(
+                sender_id, postback.get("payload", "")
+            )
+            if reply:
+                await send_message(sender_id, reply)
+            if image_ids:
+                await send_images(sender_id, image_ids)
+    except Exception:
+        logger.exception("Unhandled error processing messaging event")
+
+
 @app.post("/webhook")
 async def receive_webhook(request: Request):
     """Receive and process webhook events from Facebook."""
@@ -191,59 +272,15 @@ async def receive_webhook(request: Request):
         raise HTTPException(status_code=403, detail="Invalid signature")
 
     data = await request.json()
-    logger.info("Webhook event: %s", data)
+    logger.info("Webhook event received")
 
     if data.get("object") != "page":
         raise HTTPException(status_code=404, detail="Not a page event")
 
+    # Spawn background tasks — return 200 immediately so Facebook won't retry
     for entry in data.get("entry", []):
         for event in entry.get("messaging", []):
-            sender_id = event.get("sender", {}).get("id")
-            recipient_id = event.get("recipient", {}).get("id")
-
-            # Skip echo messages
-            message = event.get("message", {})
-            if message.get("is_echo"):
-                logger.info("Skipping echo message from %s", sender_id)
-                continue
-
-            # Text message
-            text = message.get("text")
-            if text:
-                logger.info(
-                    "Message from %s to %s: %s", sender_id, recipient_id, text
-                )
-                reply, image_ids = await forward_to_agent(sender_id, text)
-                if reply:
-                    await send_message(sender_id, reply)
-                if image_ids:
-                    await send_images(sender_id, image_ids)
-
-            # Attachments
-            attachments = message.get("attachments")
-            if attachments:
-                logger.info(
-                    "Attachments from %s: %s",
-                    sender_id,
-                    [a.get("type") for a in attachments],
-                )
-
-            # Postback
-            postback = event.get("postback")
-            if postback:
-                logger.info(
-                    "Postback from %s: title=%s payload=%s",
-                    sender_id,
-                    postback.get("title"),
-                    postback.get("payload"),
-                )
-                reply, image_ids = await forward_to_agent(
-                    sender_id, postback.get("payload", "")
-                )
-                if reply:
-                    await send_message(sender_id, reply)
-                if image_ids:
-                    await send_images(sender_id, image_ids)
+            asyncio.create_task(_process_messaging_event(event))
 
     return PlainTextResponse("EVENT_RECEIVED")
 
