@@ -9,11 +9,12 @@ Usage:
     2. Start this API:        cd agent && python agent_api.py
 """
 
-import os
 import re
+import sys
 import traceback
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -23,59 +24,20 @@ from pydantic import BaseModel, Field
 from agents import Agent, Runner, trace
 from agents.mcp import MCPServerStreamableHttp
 from session_store import SessionStore
+from agent_config import AGENT_INSTRUCTIONS, AGENT_MODEL, MCP_SERVER_URL
 
 load_dotenv()
 
-# ════════════════════════════════════════════════════════════
-#  CONFIG
-# ════════════════════════════════════════════════════════════
+# Add project root for shared imports
+_PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
 
-MCP_ORDER_URL = os.getenv("MCP_SERVER_URL", "http://localhost:8000/mcp")
-AGENT_MODEL = os.getenv("AGENT_MODEL", "gpt-4o-mini")
-
-AGENT_INSTRUCTIONS = """\
-คุณคือ ผู้ช่วยขาย ผงเครื่องเทศหอมรักกัน
-
-คุณช่วยผู้ใช้เรื่อง:
-- ตอบคำถามเกี่ยวกับสินค้า ผงเครื่องเทศหอมรักกัน และ ผงสามเกลอ
-- แนะนำสูตรทำน้ำซุป (น้ำข้น, น้ำใส) พร้อมวัตถุดิบ
-- แจ้งราคาและโปรโมชั่น (ขนาด 15g, 30g)
-- แสดงรีวิวจากลูกค้า
-- แจ้งช่องทางการซื้อ (Facebook, TikTok, Shopee, Lazada)
-- แสดงใบรับรอง (อย., ฮาลาล, เจ)
-- สร้างคำสั่งซื้อเมื่อลูกค้ายืนยัน
-- จดจำข้อมูลลูกค้าด้วย memory tools
-
-กฎ:
-- ตอบกลับภาษาเดียวกับที่ผู้ใช้พิมพ์มา
-- ใช้ knowledge_search เพื่อดึงข้อมูลจริงเสมอ ห้ามเดาหรือแต่งข้อมูล
-- เมื่อผลลัพธ์จาก knowledge_search มี image_ids ให้แนบรูปภาพโดยใส่ marker <<IMG:IMAGE_ID>> ในข้อความ
-  ตัวอย่าง: ถ้า image_ids = ["IMG_PROD_001", "IMG_REVIEW_001"] ให้ใส่ <<IMG:IMG_PROD_001>> <<IMG:IMG_REVIEW_001>> ท้ายข้อความ
-- แนบรูปเฉพาะที่เกี่ยวข้องกับคำถาม อย่าแนบทุกรูป ส่งรูปไม่เกิน 3 รูปต่อข้อความ
-- เมื่อผู้ใช้ถามเกี่ยวกับสินค้า ให้ใช้:
-  • knowledge_search — ค้นหาข้อมูลสินค้า สูตร ราคา รีวิว ฯลฯ
-    รองรับ category filter: product_overview, product_features, certifications,
-    recipe, recipe_ingredients, pricing, sales_channels, how_to_use,
-    customer_reviews, product_variant
-  • list_product — ตรวจสอบสต็อก/ราคาล่าสุดจากระบบ, สร้าง order
-- สร้าง/ดู/ลบ order draft และแนบการชำระเงิน
-- ตรวจสอบสถานะการจัดส่ง
-- ดูรายงานยอดขาย
-- ตรวจสอบที่อยู่
-- จดจำข้อมูลสำคัญของผู้ใช้ด้วย memory tools:
-  • memory_add — บันทึกข้อมูลสำคัญ (ชื่อ, ที่อยู่, จำนวนสั่งซื้อ, สูตรที่สนใจ)
-  • memory_search — ค้นหาสิ่งที่เคยจำไว้ก่อนตอบ
-  • memory_get_all — ดูข้อมูลทั้งหมดของผู้ใช้
-  • memory_delete — ลบข้อมูลที่ผู้ใช้ขอให้ลืม
-- เมื่อผู้ใช้บอกข้อมูลสำคัญ ให้ memory_add ทันที
-- ทุก memory tool ต้องส่ง user_id เสมอ
-
-รูปแบบการตอบ:
-- ห้ามใช้ตาราง markdown (| --- |) เด็ดขาด เพราะแสดงผลไม่สวยบน Messenger
-- ใช้รายการแบบเลขลำดับ (1. 2. 3.) หรือขีดหัวข้อ (•) แทน
-- ข้อความกระชับ อ่านง่ายบนมือถือ
-- marker <<IMG:...>> ให้ใส่ท้ายข้อความเท่านั้น ห้ามใส่กลางประโยค
-"""
+from shared.constants import (
+    ERROR_SYSTEM_UNAVAILABLE,
+    ERROR_NO_OUTPUT,
+    ERROR_PROCESSING,
+)
 
 # ════════════════════════════════════════════════════════════
 #  IMAGE MARKER PARSING
@@ -146,10 +108,10 @@ async def lifespan(app: FastAPI):
     global order_mcp, agent
 
     # ── Startup ──
-    print(f"Connecting to MCP server: {MCP_ORDER_URL}")
+    print(f"Connecting to MCP server: {MCP_SERVER_URL}")
     order_mcp = MCPServerStreamableHttp(
         name="Order MCP",
-        params={"url": MCP_ORDER_URL, "timeout": 30},
+        params={"url": MCP_SERVER_URL, "timeout": 30},
         client_session_timeout_seconds=30,
         cache_tools_list=True,
     )
@@ -228,7 +190,7 @@ async def chat(req: ChatRequest):
                 traceback.print_exc()
                 return ChatResponse(
                     session_id=session_id,
-                    response="ขออภัย ระบบไม่สามารถประมวลผลได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง",
+                    response=ERROR_SYSTEM_UNAVAILABLE,
                     image_ids=[],
                     memory_count=0,
                 )
@@ -236,7 +198,7 @@ async def chat(req: ChatRequest):
             traceback.print_exc()
             return ChatResponse(
                 session_id=session_id,
-                response="ขออภัย ระบบไม่สามารถประมวลผลได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง",
+                response=ERROR_SYSTEM_UNAVAILABLE,
                 image_ids=[],
                 memory_count=len(history),
             )
@@ -244,7 +206,7 @@ async def chat(req: ChatRequest):
         traceback.print_exc()
         return ChatResponse(
             session_id=session_id,
-            response="ขออภัย ระบบไม่สามารถประมวลผลได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง",
+            response=ERROR_SYSTEM_UNAVAILABLE,
             image_ids=[],
             memory_count=len(history),
         )
@@ -253,10 +215,10 @@ async def chat(req: ChatRequest):
     try:
         new_history = _filter_history_for_storage(result.to_input_list())
         session_store.save(session_id, new_history)
-        raw_reply = result.final_output or "ขออภัย ไม่สามารถสร้างคำตอบได้ กรุณาลองใหม่"
+        raw_reply = result.final_output or ERROR_NO_OUTPUT
     except Exception:
         traceback.print_exc()
-        raw_reply = "ขออภัย เกิดข้อผิดพลาดในการประมวลผลคำตอบ"
+        raw_reply = ERROR_PROCESSING
 
     # Parse image markers from agent response
     clean_reply, image_ids = parse_image_markers(raw_reply)

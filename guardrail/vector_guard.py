@@ -2,18 +2,25 @@
 
 import json
 import logging
+import sys
 from pathlib import Path
 
 import faiss
 import numpy as np
 from openai import AsyncOpenAI
 
-from config import (
-    EMBEDDING_DIM,
+# Import shared embedding utilities from agent/vector_search.py
+_PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
+from agent.vector_search import (
     EMBEDDING_MODEL,
-    OPENAI_API_KEY,
-    VECTOR_SIMILARITY_THRESHOLD,
+    EMBEDDING_DIM,
+    get_embeddings_batch,
+    build_faiss_index,
 )
+from config import OPENAI_API_KEY, VECTOR_SIMILARITY_THRESHOLD
 
 logger = logging.getLogger("guardrail.vector")
 
@@ -42,17 +49,10 @@ def init_vector_guard() -> None:
         data = json.load(f)
     _topic_texts = data["allowed_topics"]
 
-    # Batch embed all topics
-    response = sync_client.embeddings.create(model=EMBEDDING_MODEL, input=_topic_texts)
-    embeddings = np.array(
-        [item.embedding for item in sorted(response.data, key=lambda x: x.index)],
-        dtype=np.float32,
-    )
-
-    # Build FAISS index (cosine similarity via normalize + inner product)
-    faiss.normalize_L2(embeddings)
-    _topic_index = faiss.IndexFlatIP(EMBEDDING_DIM)
-    _topic_index.add(embeddings)
+    # Use shared batch embedding + FAISS index builder
+    embeddings_list = get_embeddings_batch(sync_client, _topic_texts)
+    embeddings = np.array(embeddings_list, dtype=np.float32)
+    _topic_index = build_faiss_index(embeddings)
 
     logger.info(
         "Vector guard initialized: %d topics, threshold=%.2f",
@@ -71,7 +71,7 @@ async def check_vector_similarity(message: str) -> tuple[bool, float, str]:
         logger.error("Vector guard not initialized")
         return True, 0.0, "guard_not_initialized"  # Fail-open
 
-    # Embed user message (async)
+    # Embed user message (async — cannot use sync get_embedding here)
     response = await _async_client.embeddings.create(
         model=EMBEDDING_MODEL, input=message
     )

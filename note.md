@@ -29,3 +29,5 @@ https://zaida-untrampled-overgreatly.ngrok-free.dev/webhook
 # Gosass
 user: hopewitwa@gmail.com
 pass: !#mJt4&6
+
+ใช้ context7 ทุกครั้งก่อน implement

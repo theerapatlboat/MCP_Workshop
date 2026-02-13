@@ -10,8 +10,8 @@ Usage:
 """
 
 import asyncio
-import sys
 import os
+import sys
 import time
 
 from dotenv import load_dotenv
@@ -31,6 +31,7 @@ from agents import (
 from agents.mcp import MCPServerStreamableHttp
 from openai.types.responses import ResponseTextDeltaEvent
 from session_store import SessionStore
+from agent_config import AGENT_INSTRUCTIONS, AGENT_MODEL, MCP_SERVER_URL
 
 load_dotenv()
 
@@ -184,44 +185,12 @@ class ConsoleTraceProcessor:
 
 
 # ════════════════════════════════════════════════════════════
-#  AGENT CONFIGURATION
+#  CLI CONFIGURATION
 # ════════════════════════════════════════════════════════════
 
-MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://localhost:8000/mcp")
-AGENT_MODEL = os.getenv("AGENT_MODEL", "gpt-4o-mini")
 CLI_SESSION_ID = os.getenv("CLI_SESSION_ID", "cli")
 
 session_store = SessionStore()
-
-AGENT_INSTRUCTIONS = """\
-You are GoSaaS Order Management Assistant.
-
-You help users with:
-- Order drafts: create, view, delete, attach payments
-- Product search and details
-- Smart product search via hybrid_search (semantic + substring + LLM refinement)
-- Shipping status tracking
-- Sales reports and summaries
-- Address verification
-- FAQ and intent classification
-
-Rules:
-- Reply in the same language the user writes in
-- Always use tools to get real data — never guess or fabricate
-- When creating orders, first verify the address and fetch meta data
-- Show results clearly and concisely
-- When users ask about products, choose the right tool:
-  • hybrid_search — recommendations, comparisons, search by attributes (color, screen, price, brand)
-    Supports filters: min_price, max_price, color, model, min_screen, max_screen, min_stock
-  • list_product — check live stock/price, view all products, create orders
-- Remember important user info with memory tools (long-term memory across sessions):
-  • memory_add — store important info (name, preferences, budget, favorite brand, color)
-  • memory_search — recall previously stored info before answering
-  • memory_get_all — view all stored info for a user
-  • memory_delete — forget info when the user asks
-- When a user shares important info (name, budget, favorite brand), call memory_add immediately
-- All memory tools require user_id parameter
-"""
 
 
 # ════════════════════════════════════════════════════════════
@@ -309,7 +278,7 @@ async def main():
                 print(f"    - {t.name}: {t.description[:60] if t.description else ''}")
 
             agent = Agent(
-                name="GoSaaS Assistant",
+                name="Raggan Sales Assistant",
                 instructions=AGENT_INSTRUCTIONS,
                 mcp_servers=[server],
                 model=AGENT_MODEL,

@@ -12,14 +12,21 @@ Usage:
 
 import asyncio
 import json
-import logging
+import sys
 from contextlib import asynccontextmanager
-from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI
+
+# Add project root for shared imports
+_PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
+from shared.constants import ERROR_SYSTEM_UNAVAILABLE_SHORT
+from shared.http_client import forward_to_agent as _forward_to_agent
+from shared.logging_setup import setup_logger
 
 from config import AGENT_API_URL, GUARDRAIL_PORT
 from llm_guard import check_llm_policy, init_llm_guard
@@ -31,23 +38,7 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
-LOG_DIR = Path(__file__).parent / "logs"
-LOG_DIR.mkdir(exist_ok=True)
-
-logger = logging.getLogger("guardrail")
-logger.setLevel(logging.INFO)
-
-formatter = logging.Formatter("%(asctime)s | %(levelname)-8s | %(message)s")
-
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
-
-file_handler = RotatingFileHandler(
-    LOG_DIR / "guardrail.log", maxBytes=5_000_000, backupCount=3, encoding="utf-8"
-)
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
+logger = setup_logger("guardrail", Path(__file__).parent / "logs", "guardrail.log")
 
 # Load rejection message from topics.json
 _topics_path = Path(__file__).parent / "topics.json"
@@ -141,20 +132,13 @@ async def guard(req: GuardRequest):
     # Forward to agent API
     logger.info("PASSED: session=%s forwarding to agent", req.session_id)
     try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                AGENT_API_URL,
-                json={"session_id": req.session_id, "message": req.message},
-                timeout=30,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            agent_reply = data.get("response", data.get("reply", ""))
-            memory_count = data.get("memory_count", 0)
-            image_ids = data.get("image_ids", [])
+        result = await _forward_to_agent(AGENT_API_URL, req.session_id, req.message)
+        agent_reply = result["response"]
+        memory_count = result["memory_count"]
+        image_ids = result["image_ids"]
     except Exception as exc:
         logger.error("Agent API request failed: %s", exc)
-        agent_reply = "ขออภัย ระบบไม่สามารถประมวลผลได้ในขณะนี้"
+        agent_reply = ERROR_SYSTEM_UNAVAILABLE_SHORT
         memory_count = 0
         image_ids = []
 

@@ -2,10 +2,9 @@ import asyncio
 import hashlib
 import hmac
 import json
-import logging
 import os
+import sys
 import time
-from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 import httpx
@@ -14,6 +13,15 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
 load_dotenv()
+
+# Add project root for shared imports
+_PROJECT_ROOT = str(Path(__file__).resolve().parent.parent)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
+from shared.constants import ERROR_SYSTEM_UNAVAILABLE_SHORT
+from shared.http_client import forward_to_agent as _forward_to_agent
+from shared.logging_setup import setup_logger
 
 FB_VERIFY_TOKEN = os.getenv("FB_VERIFY_TOKEN", "")
 FB_APP_SECRET = os.getenv("FB_APP_SECRET", "")
@@ -31,24 +39,7 @@ fb_attachment_ids: dict[str, str] = {}
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
-LOG_DIR = Path(__file__).parent / "logs"
-LOG_DIR.mkdir(exist_ok=True)
-
-logger = logging.getLogger("webhook")
-logger.setLevel(logging.INFO)
-
-if not logger.handlers:
-    formatter = logging.Formatter("%(asctime)s | %(levelname)-8s | %(message)s")
-
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-
-    file_handler = RotatingFileHandler(
-        LOG_DIR / "webhook.log", maxBytes=5_000_000, backupCount=3, encoding="utf-8"
-    )
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
+logger = setup_logger("webhook", Path(__file__).parent / "logs", "webhook.log")
 
 # ---------------------------------------------------------------------------
 # FastAPI app
@@ -164,20 +155,11 @@ async def send_images(recipient_id: str, image_ids: list[str]) -> None:
 async def forward_to_agent(sender_id: str, text: str) -> tuple[str, list[str]]:
     """Forward the user message to the AI Agent and return (reply_text, image_ids)."""
     try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                AI_AGENT_URL,
-                json={"session_id": sender_id, "message": text},
-                timeout=30,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            reply = data.get("response", data.get("reply", ""))
-            image_ids = data.get("image_ids", [])
-            return reply, image_ids
+        result = await _forward_to_agent(AI_AGENT_URL, sender_id, text)
+        return result["response"], result["image_ids"]
     except Exception as exc:
         logger.error("AI Agent request failed: %s", exc)
-        return "ขออภัย ระบบไม่สามารถประมวลผลได้ในขณะนี้", []
+        return ERROR_SYSTEM_UNAVAILABLE_SHORT, []
 
 
 # ---------------------------------------------------------------------------
