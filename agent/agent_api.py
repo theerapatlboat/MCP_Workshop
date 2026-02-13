@@ -17,6 +17,7 @@ from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from openai import BadRequestError
 from pydantic import BaseModel, Field
 
 from agents import Agent, Runner, trace
@@ -95,6 +96,35 @@ def parse_image_markers(text: str) -> tuple[str, list[str]]:
     # Deduplicate while preserving order
     unique_ids = list(dict.fromkeys(image_ids))
     return clean_text, unique_ids
+
+
+# ════════════════════════════════════════════════════════════
+#  SESSION HISTORY FILTER
+# ════════════════════════════════════════════════════════════
+
+
+def _filter_history_for_storage(items: list) -> list:
+    """Filter conversation history to keep only user/assistant text messages.
+
+    Removes tool call items (function_call, function_call_output) to prevent
+    orphaned references when history is truncated by SessionStore.
+    """
+    filtered = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        item_type = item.get("type")
+        # Skip tool-related items
+        if item_type in ("function_call", "function_call_output"):
+            continue
+        role = item.get("role")
+        # Keep user messages
+        if role == "user":
+            filtered.append(item)
+        # Keep assistant message outputs (Responses API format)
+        elif item_type == "message" or role == "assistant":
+            filtered.append(item)
+    return filtered
 
 
 # ════════════════════════════════════════════════════════════
@@ -183,6 +213,33 @@ async def chat(req: ChatRequest):
     try:
         with trace("Chat API"):
             result = await Runner.run(agent, input=input_messages)
+    except BadRequestError as e:
+        if "No tool call found" in str(e):
+            # Session history corrupted — clear and retry with fresh input
+            print(f"Corrupted session {session_id}, clearing and retrying...")
+            session_store.delete(session_id)
+            try:
+                with trace("Chat API (retry)"):
+                    result = await Runner.run(
+                        agent,
+                        input=[{"role": "user", "content": req.message}],
+                    )
+            except Exception:
+                traceback.print_exc()
+                return ChatResponse(
+                    session_id=session_id,
+                    response="ขออภัย ระบบไม่สามารถประมวลผลได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง",
+                    image_ids=[],
+                    memory_count=0,
+                )
+        else:
+            traceback.print_exc()
+            return ChatResponse(
+                session_id=session_id,
+                response="ขออภัย ระบบไม่สามารถประมวลผลได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง",
+                image_ids=[],
+                memory_count=len(history),
+            )
     except Exception:
         traceback.print_exc()
         return ChatResponse(
@@ -194,7 +251,7 @@ async def chat(req: ChatRequest):
 
     # Extract response and update session
     try:
-        new_history = result.to_input_list()
+        new_history = _filter_history_for_storage(result.to_input_list())
         session_store.save(session_id, new_history)
         raw_reply = result.final_output or "ขออภัย ไม่สามารถสร้างคำตอบได้ กรุณาลองใหม่"
     except Exception:
