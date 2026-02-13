@@ -25,3 +25,7 @@ https://zaida-untrampled-overgreatly.ngrok-free.dev/webhook
 
 - long term in mcp men0
 - short term in agent not tool
+
+# Gosass
+user: hopewitwa@gmail.com
+pass: !#mJt4&6
