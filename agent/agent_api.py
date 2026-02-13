@@ -10,6 +10,7 @@ Usage:
 """
 
 import os
+import re
 import traceback
 import uuid
 from contextlib import asynccontextmanager
@@ -32,40 +33,69 @@ MCP_ORDER_URL = os.getenv("MCP_SERVER_URL", "http://localhost:8000/mcp")
 AGENT_MODEL = os.getenv("AGENT_MODEL", "gpt-4o-mini")
 
 AGENT_INSTRUCTIONS = """\
-คุณคือ GoSaaS Order Management Assistant
+คุณคือ ผู้ช่วยขาย ผงเครื่องเทศหอมรักกัน
 
 คุณช่วยผู้ใช้เรื่อง:
-- สร้าง/ดู/ลบ order draft และแนบการชำระเงิน
-- ค้นหาสินค้าและดูรายละเอียด
-- ค้นหาสินค้าอัจฉริยะด้วย hybrid_search (semantic + substring + LLM refinement)
-- ตรวจสอบสถานะการจัดส่ง
-- ดูรายงานยอดขาย
-- ตรวจสอบที่อยู่
-- ตอบคำถามทั่วไป (FAQ) และจัดประเภทข้อความ
+- ตอบคำถามเกี่ยวกับสินค้า ผงเครื่องเทศหอมรักกัน และ ผงสามเกลอ
+- แนะนำสูตรทำน้ำซุป (น้ำข้น, น้ำใส) พร้อมวัตถุดิบ
+- แจ้งราคาและโปรโมชั่น (ขนาด 15g, 30g)
+- แสดงรีวิวจากลูกค้า
+- แจ้งช่องทางการซื้อ (Facebook, TikTok, Shopee, Lazada)
+- แสดงใบรับรอง (อย., ฮาลาล, เจ)
+- สร้างคำสั่งซื้อเมื่อลูกค้ายืนยัน
+- จดจำข้อมูลลูกค้าด้วย memory tools
 
 กฎ:
 - ตอบกลับภาษาเดียวกับที่ผู้ใช้พิมพ์มา
-- ใช้ tools เพื่อดึงข้อมูลจริงเสมอ ห้ามเดาหรือแต่งข้อมูล
-- เมื่อสร้าง order ให้ตรวจสอบที่อยู่และดึง meta data ก่อน
-- แสดงผลลัพธ์ให้ชัดเจนและกระชับ
-- เมื่อผู้ใช้ถามเกี่ยวกับสินค้า ให้เลือกใช้ tool ตามนี้:
-  • hybrid_search — แนะนำสินค้า, เปรียบเทียบ, ค้นหาตามคุณสมบัติ (สี, จอ, ราคา, ยี่ห้อ)
-    รองรับ filter: min_price, max_price, color, model, min_screen, max_screen, min_stock
-  • list_product — ตรวจสอบสต็อก/ราคาล่าสุด, ดูรายการสินค้าทั้งหมด, สร้าง order
-- จดจำข้อมูลสำคัญของผู้ใช้ด้วย memory tools (long-term memory ข้ามเซสชัน):
-  • memory_add — บันทึกข้อมูลสำคัญ (ชื่อ, preference, งบ, ยี่ห้อที่ชอบ, สีที่ชอบ)
+- ใช้ knowledge_search เพื่อดึงข้อมูลจริงเสมอ ห้ามเดาหรือแต่งข้อมูล
+- เมื่อผลลัพธ์จาก knowledge_search มี image_ids ให้แนบรูปภาพโดยใส่ marker <<IMG:IMAGE_ID>> ในข้อความ
+  ตัวอย่าง: ถ้า image_ids = ["IMG_PROD_001", "IMG_REVIEW_001"] ให้ใส่ <<IMG:IMG_PROD_001>> <<IMG:IMG_REVIEW_001>> ท้ายข้อความ
+- แนบรูปเฉพาะที่เกี่ยวข้องกับคำถาม อย่าแนบทุกรูป ส่งรูปไม่เกิน 3 รูปต่อข้อความ
+- เมื่อผู้ใช้ถามเกี่ยวกับสินค้า ให้ใช้:
+  • knowledge_search — ค้นหาข้อมูลสินค้า สูตร ราคา รีวิว ฯลฯ
+    รองรับ category filter: product_overview, product_features, certifications,
+    recipe, recipe_ingredients, pricing, sales_channels, how_to_use,
+    customer_reviews, product_variant
+  • list_product — ตรวจสอบสต็อก/ราคาล่าสุดจากระบบ, สร้าง order
+- สร้าง/ดู/ลบ order draft และแนบการชำระเงิน
+- ตรวจสอบสถานะการจัดส่ง
+- ดูรายงานยอดขาย
+- ตรวจสอบที่อยู่
+- จดจำข้อมูลสำคัญของผู้ใช้ด้วย memory tools:
+  • memory_add — บันทึกข้อมูลสำคัญ (ชื่อ, ที่อยู่, จำนวนสั่งซื้อ, สูตรที่สนใจ)
   • memory_search — ค้นหาสิ่งที่เคยจำไว้ก่อนตอบ
   • memory_get_all — ดูข้อมูลทั้งหมดของผู้ใช้
   • memory_delete — ลบข้อมูลที่ผู้ใช้ขอให้ลืม
-- เมื่อผู้ใช้บอกข้อมูลสำคัญ (ชื่อ, งบ, ยี่ห้อที่ชอบ) ให้ memory_add ทันที
+- เมื่อผู้ใช้บอกข้อมูลสำคัญ ให้ memory_add ทันที
 - ทุก memory tool ต้องส่ง user_id เสมอ
 
 รูปแบบการตอบ:
 - ห้ามใช้ตาราง markdown (| --- |) เด็ดขาด เพราะแสดงผลไม่สวยบน Messenger
 - ใช้รายการแบบเลขลำดับ (1. 2. 3.) หรือขีดหัวข้อ (•) แทน
-- แต่ละรายการให้แสดงชื่อ ราคา และจำนวนสต็อกในบรรทัดเดียวกัน
-- ถ้ามีข้อมูลเยอะ ให้แสดงแค่ 10 รายการแรก พร้อมบอกจำนวนทั้งหมด
+- ข้อความกระชับ อ่านง่ายบนมือถือ
+- marker <<IMG:...>> ให้ใส่ท้ายข้อความเท่านั้น ห้ามใส่กลางประโยค
 """
+
+# ════════════════════════════════════════════════════════════
+#  IMAGE MARKER PARSING
+# ════════════════════════════════════════════════════════════
+
+IMG_MARKER_PATTERN = re.compile(r"<<IMG:(IMG_[A-Z]+_\d+)>>")
+
+
+def parse_image_markers(text: str) -> tuple[str, list[str]]:
+    """Extract <<IMG:...>> markers from text, return (clean_text, image_ids).
+
+    Example:
+        Input:  "สินค้าครบ 3 แบบ <<IMG:IMG_PROD_001>> <<IMG:IMG_REVIEW_001>>"
+        Output: ("สินค้าครบ 3 แบบ", ["IMG_PROD_001", "IMG_REVIEW_001"])
+    """
+    image_ids = IMG_MARKER_PATTERN.findall(text)
+    clean_text = IMG_MARKER_PATTERN.sub("", text).strip()
+    # Deduplicate while preserving order
+    unique_ids = list(dict.fromkeys(image_ids))
+    return clean_text, unique_ids
+
 
 # ════════════════════════════════════════════════════════════
 #  SESSION STORE (SQLite-backed)
@@ -89,7 +119,8 @@ async def lifespan(app: FastAPI):
     print(f"Connecting to MCP server: {MCP_ORDER_URL}")
     order_mcp = MCPServerStreamableHttp(
         name="Order MCP",
-        params={"url": MCP_ORDER_URL},
+        params={"url": MCP_ORDER_URL, "timeout": 30},
+        client_session_timeout_seconds=30,
         cache_tools_list=True,
     )
     await order_mcp.__aenter__()
@@ -100,7 +131,7 @@ async def lifespan(app: FastAPI):
         print(f"  - {t.name}: {t.description[:60] if t.description else ''}")
 
     agent = Agent(
-        name="GoSaaS Assistant",
+        name="Raggan Sales Assistant",
         instructions=AGENT_INSTRUCTIONS,
         mcp_servers=[order_mcp],
         model=AGENT_MODEL,
@@ -118,7 +149,7 @@ async def lifespan(app: FastAPI):
 #  FASTAPI APP
 # ════════════════════════════════════════════════════════════
 
-app = FastAPI(title="GoSaaS Chat API", lifespan=lifespan)
+app = FastAPI(title="Raggan Chat API", lifespan=lifespan)
 
 
 # ── Request / Response models ────────────────────────────
@@ -131,6 +162,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     session_id: str
     response: str
+    image_ids: list[str] = Field(default_factory=list, description="Image IDs to send as attachments")
     memory_count: int
 
 
@@ -156,6 +188,7 @@ async def chat(req: ChatRequest):
         return ChatResponse(
             session_id=session_id,
             response="ขออภัย ระบบไม่สามารถประมวลผลได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง",
+            image_ids=[],
             memory_count=len(history),
         )
 
@@ -163,14 +196,18 @@ async def chat(req: ChatRequest):
     try:
         new_history = result.to_input_list()
         session_store.save(session_id, new_history)
-        reply = result.final_output or "ขออภัย ไม่สามารถสร้างคำตอบได้ กรุณาลองใหม่"
+        raw_reply = result.final_output or "ขออภัย ไม่สามารถสร้างคำตอบได้ กรุณาลองใหม่"
     except Exception:
         traceback.print_exc()
-        reply = "ขออภัย เกิดข้อผิดพลาดในการประมวลผลคำตอบ"
+        raw_reply = "ขออภัย เกิดข้อผิดพลาดในการประมวลผลคำตอบ"
+
+    # Parse image markers from agent response
+    clean_reply, image_ids = parse_image_markers(raw_reply)
 
     return ChatResponse(
         session_id=session_id,
-        response=reply,
+        response=clean_reply,
+        image_ids=image_ids,
         memory_count=session_store.count(session_id),
     )
 

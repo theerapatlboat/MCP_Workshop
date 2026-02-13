@@ -151,10 +151,12 @@ async def guard(req: GuardRequest):
             data = resp.json()
             agent_reply = data.get("response", data.get("reply", ""))
             memory_count = data.get("memory_count", 0)
+            image_ids = data.get("image_ids", [])
     except Exception as exc:
         logger.error("Agent API request failed: %s", exc)
         agent_reply = "ขออภัย ระบบไม่สามารถประมวลผลได้ในขณะนี้"
         memory_count = 0
+        image_ids = []
 
     return GuardResponse(
         session_id=req.session_id,
@@ -163,6 +165,7 @@ async def guard(req: GuardRequest):
         vector_check=vector_result,
         llm_check=llm_result,
         memory_count=memory_count,
+        image_ids=image_ids,
     )
 
 

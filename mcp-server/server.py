@@ -42,6 +42,13 @@ Run the server:
     python server.py
 """
 
+import asyncio
+import sys
+
+# Windows: use SelectorEventLoop to avoid ConnectionResetError [WinError 10054]
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 from mcp.server.fastmcp import FastMCP
 from tools import order_draft, product, shipment, report, order, utilities, hybrid_search, memory
 

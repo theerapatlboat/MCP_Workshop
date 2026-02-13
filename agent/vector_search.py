@@ -1,12 +1,13 @@
 """Semantic search REPL using OpenAI embeddings + FAISS + SQLite.
 
-Store and retrieve documents by semantic similarity.
-Supports structured product files with metadata filtering.
+Store and retrieve knowledge base documents by semantic similarity.
+Supports JSONL knowledge files with category and image_ids metadata.
 
 Usage:
     python agent/vector_search.py
 """
 
+import json
 import os
 import re
 import sqlite3
@@ -31,9 +32,6 @@ EMBEDDING_MODEL = "text-embedding-3-small"
 EMBEDDING_DIM = 1536
 DB_PATH = Path(__file__).parent / "vector_store.db"
 
-# Expected header for structured product files
-PRODUCT_COLUMNS = ["id", "name", "sku", "price", "stock", "color", "model", "screen_size"]
-
 
 # ════════════════════════════════════════════════════════════
 #  SQLITE LAYER
@@ -48,13 +46,10 @@ def init_db(db_path: Path = DB_PATH) -> sqlite3.Connection:
             text        TEXT NOT NULL,
             embedding   BLOB NOT NULL,
             created_at  TEXT NOT NULL,
-            name        TEXT,
-            sku         TEXT,
-            price       REAL,
-            stock       INTEGER,
-            color       TEXT,
-            model       TEXT,
-            screen_size REAL
+            doc_id      TEXT,
+            category    TEXT,
+            title       TEXT,
+            image_ids   TEXT
         )
     """)
     conn.commit()
@@ -62,13 +57,10 @@ def init_db(db_path: Path = DB_PATH) -> sqlite3.Connection:
     # Migrate: add metadata columns if they don't exist (for old DBs)
     existing = {row[1] for row in conn.execute("PRAGMA table_info(documents)").fetchall()}
     migrations = [
-        ("name", "TEXT"),
-        ("sku", "TEXT"),
-        ("price", "REAL"),
-        ("stock", "INTEGER"),
-        ("color", "TEXT"),
-        ("model", "TEXT"),
-        ("screen_size", "REAL"),
+        ("doc_id", "TEXT"),
+        ("category", "TEXT"),
+        ("title", "TEXT"),
+        ("image_ids", "TEXT"),
     ]
     for col, typ in migrations:
         if col not in existing:
@@ -85,20 +77,22 @@ def store_document(
 ) -> int:
     """Insert a document + embedding + optional metadata. Returns the new row ID."""
     meta = metadata or {}
+    image_ids_val = meta.get("image_ids")
+    if isinstance(image_ids_val, list):
+        image_ids_str = json.dumps(image_ids_val, ensure_ascii=False)
+    else:
+        image_ids_str = image_ids_val
     cur = conn.execute(
-        """INSERT INTO documents (text, embedding, created_at, name, sku, price, stock, color, model, screen_size)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        """INSERT INTO documents (text, embedding, created_at, doc_id, category, title, image_ids)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
         (
             text,
             embedding.tobytes(),
             datetime.now(timezone.utc).isoformat(),
-            meta.get("name"),
-            meta.get("sku"),
-            meta.get("price"),
-            meta.get("stock"),
-            meta.get("color"),
-            meta.get("model"),
-            meta.get("screen_size"),
+            meta.get("doc_id"),
+            meta.get("category"),
+            meta.get("title"),
+            image_ids_str,
         ),
     )
     conn.commit()
@@ -139,29 +133,47 @@ def load_filtered_embeddings(
 
 
 def _build_filter_clauses(filters: dict) -> tuple[list[str], list]:
-    """Build SQL WHERE clauses from a filters dict. Shared by filtered embeddings and substring search."""
+    """Build SQL WHERE clauses from a filters dict."""
     where_clauses = []
     params = []
     for key, value in filters.items():
-        if key == "min_price":
-            where_clauses.append("price >= ?")
-            params.append(float(value))
-        elif key == "max_price":
-            where_clauses.append("price <= ?")
-            params.append(float(value))
-        elif key == "min_screen":
-            where_clauses.append("screen_size >= ?")
-            params.append(float(value))
-        elif key == "max_screen":
-            where_clauses.append("screen_size <= ?")
-            params.append(float(value))
-        elif key in ("name", "color", "model", "sku"):
+        if key == "category":
+            where_clauses.append("category = ?")
+            params.append(value)
+        elif key == "exclude_category":
+            where_clauses.append("category <> ?")
+            params.append(value)
+        elif key in ("doc_id", "title"):
             where_clauses.append(f"{key} LIKE ?")
             params.append(f"%{value}%")
-        elif key == "min_stock":
-            where_clauses.append("stock >= ?")
-            params.append(int(value))
     return where_clauses, params
+
+
+def _parse_image_ids(raw: str | None) -> list[str]:
+    """Parse image_ids from JSON string or return empty list."""
+    if not raw:
+        return []
+    try:
+        result = json.loads(raw)
+        return result if isinstance(result, list) else []
+    except (json.JSONDecodeError, TypeError):
+        return []
+
+
+def _row_to_dict(r: tuple) -> dict:
+    """Convert a SELECT row (id, text, created_at, doc_id, category, title, image_ids) to dict."""
+    return {
+        "id": r[0],
+        "text": r[1],
+        "created_at": r[2],
+        "doc_id": r[3],
+        "category": r[4],
+        "title": r[5],
+        "image_ids": _parse_image_ids(r[6]),
+    }
+
+
+_SELECT_COLS = "id, text, created_at, doc_id, category, title, image_ids"
 
 
 def substring_search(
@@ -170,17 +182,11 @@ def substring_search(
     filters: dict | None = None,
     limit: int = 5,
 ) -> list[dict]:
-    """Search documents by substring match across text and metadata columns.
-
-    Searches: text, name, sku, color, model.
-    Returns list of document dicts (same shape as get_documents_by_ids).
-    """
+    """Search documents by substring match across text, title, category, doc_id."""
     like_param = f"%{query}%"
-    # Substring match across multiple columns
-    text_match = "(text LIKE ? OR name LIKE ? OR sku LIKE ? OR color LIKE ? OR model LIKE ?)"
-    params: list = [like_param] * 5
+    text_match = "(text LIKE ? OR title LIKE ? OR category LIKE ? OR doc_id LIKE ?)"
+    params: list = [like_param] * 4
 
-    # Apply metadata filters if provided
     if filters:
         filter_clauses, filter_params = _build_filter_clauses(filters)
         if filter_clauses:
@@ -192,19 +198,11 @@ def substring_search(
         where_sql = text_match
 
     rows = conn.execute(
-        f"""SELECT id, text, created_at, name, sku, price, stock, color, model, screen_size
-            FROM documents WHERE {where_sql} ORDER BY id LIMIT ?""",
+        f"SELECT {_SELECT_COLS} FROM documents WHERE {where_sql} ORDER BY id LIMIT ?",
         params + [limit],
     ).fetchall()
 
-    return [
-        {
-            "id": r[0], "text": r[1], "created_at": r[2],
-            "name": r[3], "sku": r[4], "price": r[5],
-            "stock": r[6], "color": r[7], "model": r[8], "screen_size": r[9],
-        }
-        for r in rows
-    ]
+    return [_row_to_dict(r) for r in rows]
 
 
 def get_documents_by_ids(conn: sqlite3.Connection, doc_ids: list[int]) -> list[dict]:
@@ -213,18 +211,10 @@ def get_documents_by_ids(conn: sqlite3.Connection, doc_ids: list[int]) -> list[d
         return []
     placeholders = ",".join("?" for _ in doc_ids)
     rows = conn.execute(
-        f"""SELECT id, text, created_at, name, sku, price, stock, color, model, screen_size
-            FROM documents WHERE id IN ({placeholders})""",
+        f"SELECT {_SELECT_COLS} FROM documents WHERE id IN ({placeholders})",
         doc_ids,
     ).fetchall()
-    by_id = {
-        r[0]: {
-            "id": r[0], "text": r[1], "created_at": r[2],
-            "name": r[3], "sku": r[4], "price": r[5],
-            "stock": r[6], "color": r[7], "model": r[8], "screen_size": r[9],
-        }
-        for r in rows
-    }
+    by_id = {r[0]: _row_to_dict(r) for r in rows}
     return [by_id[did] for did in doc_ids if did in by_id]
 
 
@@ -236,16 +226,15 @@ def get_document_count(conn: sqlite3.Connection) -> int:
 def get_all_documents(conn: sqlite3.Connection) -> list[dict]:
     """Fetch all documents ordered by ID."""
     rows = conn.execute(
-        "SELECT id, text, created_at, name, sku, price, stock, color, model, screen_size FROM documents ORDER BY id"
+        f"SELECT {_SELECT_COLS} FROM documents ORDER BY id"
     ).fetchall()
-    return [
-        {
-            "id": r[0], "text": r[1], "created_at": r[2],
-            "name": r[3], "sku": r[4], "price": r[5],
-            "stock": r[6], "color": r[7], "model": r[8], "screen_size": r[9],
-        }
-        for r in rows
-    ]
+    return [_row_to_dict(r) for r in rows]
+
+
+def clear_all(conn: sqlite3.Connection) -> None:
+    """Delete all documents from the store."""
+    conn.execute("DELETE FROM documents")
+    conn.commit()
 
 
 # ════════════════════════════════════════════════════════════
@@ -253,22 +242,18 @@ def get_all_documents(conn: sqlite3.Connection) -> list[dict]:
 # ════════════════════════════════════════════════════════════
 
 def row_to_natural_language(meta: dict) -> str:
-    """Convert a product metadata row to a natural language sentence for embedding.
+    """Convert a knowledge base record to natural language for embedding.
 
-    Example output:
-      "iPhone 16 Pro Max สีดำไทเทเนียม หน้าจอ 6.9 นิ้ว ราคา 52,900 บาท มีสินค้า 15 เครื่อง (SKU: IPH-16PM-BLK-256)"
+    Combines title + content + category into a single text for embedding.
     """
-    price_str = f"{int(meta['price']):,}" if meta.get("price") else "N/A"
-    stock_str = str(meta.get("stock", "N/A"))
-    screen_str = str(meta.get("screen_size", "N/A"))
-
-    return (
-        f"{meta.get('name', '')} สี{meta.get('color', '')} "
-        f"หน้าจอ {screen_str} นิ้ว "
-        f"ราคา {price_str} บาท "
-        f"มีสินค้า {stock_str} เครื่อง "
-        f"(SKU: {meta.get('sku', '')})"
-    )
+    parts = []
+    if meta.get("title"):
+        parts.append(meta["title"])
+    if meta.get("content"):
+        parts.append(meta["content"])
+    if meta.get("category"):
+        parts.append(f"(หมวด: {meta['category']})")
+    return " ".join(parts)
 
 
 # ════════════════════════════════════════════════════════════
@@ -315,7 +300,7 @@ def get_connection() -> sqlite3.Connection:
     if not DB_PATH.exists():
         raise FileNotFoundError(
             f"Vector store DB not found at {DB_PATH}. "
-            "Run 'python agent/vector_search.py' and load data first."
+            "Run 'python agent/load_knowledge.py' to load data first."
         )
     return sqlite3.connect(str(DB_PATH))
 
@@ -332,6 +317,7 @@ def hybrid_search(
     Each result dict includes:
       - 'score': float for vector hits, None for substring-only
       - 'source': 'vector', 'substring', or 'both'
+      - 'image_ids': list of related image IDs
     """
     merged: dict[int, dict] = {}
 
@@ -391,40 +377,52 @@ def setup() -> OpenAI:
 
 
 # ════════════════════════════════════════════════════════════
-#  PRODUCT FILE PARSER
+#  KNOWLEDGE FILE PARSER
 # ════════════════════════════════════════════════════════════
 
-def parse_product_file(filepath: Path) -> list[dict] | None:
-    """Parse a pipe-delimited product file. Returns list of metadata dicts, or None if not a product file."""
+def parse_knowledge_file(filepath: Path) -> list[dict] | None:
+    """Parse a JSONL knowledge file. Returns list of record dicts, or None if not JSONL.
+
+    Each line should be a JSON object with at least 'id' and 'content' fields.
+    Also handles a single JSON object (e.g. image_mapping.txt).
+    """
     content = filepath.read_text(encoding="utf-8")
-    lines = [line.strip() for line in content.splitlines() if line.strip()]
-    if not lines:
-        return None
+    stripped = content.strip()
 
-    # Check if the first line is a matching header
-    header = [col.strip() for col in lines[0].split("|")]
-    if header != PRODUCT_COLUMNS:
-        return None
+    # Try as single JSON object first (e.g. image_mapping.txt)
+    if stripped.startswith("{") and not stripped.startswith('{"id"'):
+        try:
+            data = json.loads(stripped)
+            if isinstance(data, dict) and not data.get("id"):
+                # It's a mapping dict (like image_mapping) — convert entries to records
+                records = []
+                for key, value in data.items():
+                    if isinstance(value, dict) and value.get("description"):
+                        records.append({
+                            "id": key,
+                            "category": "image_description",
+                            "title": key,
+                            "content": value["description"],
+                            "image_ids": [key],
+                        })
+                return records if records else None
+        except json.JSONDecodeError:
+            pass
 
-    products = []
-    for line in lines[1:]:
-        cols = [col.strip() for col in line.split("|")]
-        if len(cols) != len(PRODUCT_COLUMNS):
+    # Try as JSONL (one JSON object per line)
+    records = []
+    for line in content.splitlines():
+        line = line.strip()
+        if not line:
             continue
         try:
-            products.append({
-                "name": cols[1],
-                "sku": cols[2],
-                "price": float(cols[3]),
-                "stock": int(cols[4]),
-                "color": cols[5],
-                "model": cols[6],
-                "screen_size": float(cols[7]),
-            })
-        except (ValueError, IndexError):
+            record = json.loads(line)
+            if isinstance(record, dict) and "id" in record and "content" in record:
+                records.append(record)
+        except json.JSONDecodeError:
             continue
 
-    return products if products else None
+    return records if records else None
 
 
 # ════════════════════════════════════════════════════════════
@@ -447,23 +445,26 @@ def cmd_add(client: OpenAI, conn: sqlite3.Connection, text: str) -> None:
     print(f"  Stored document {doc_id} ({len(text)} chars)")
 
 
+def cmd_clear(conn: sqlite3.Connection) -> None:
+    """Delete all documents from the vector store."""
+    clear_all(conn)
+    print("  Cleared all documents from the store.")
+
+
 def parse_filters(rest: str) -> tuple[str, dict]:
     """Extract filter flags from the query string.
 
     Supported filters:
-      --min-price 10000  --max-price 30000
-      --color สีดำ       --model Galaxy
-      --min-screen 6.5   --max-screen 6.8
-      --min-stock 10
+      --category recipe
     """
     filters = {}
     filter_pattern = re.compile(
-        r"--(min-price|max-price|color|model|min-screen|max-screen|min-stock)\s+(\S+)"
+        r"--(category)\s+(\S+)"
     )
 
     query = rest
     for match in filter_pattern.finditer(rest):
-        key = match.group(1).replace("-", "_")
+        key = match.group(1)
         filters[key] = match.group(2)
         query = query.replace(match.group(0), "")
 
@@ -478,15 +479,17 @@ def _print_doc(doc: dict, rank: int, score: float | None = None, overlap: bool =
     else:
         print(f"\n  [{rank}] ID: {doc['id']}{overlap_mark}")
 
-    if doc.get("name"):
-        price_str = f"{int(doc['price']):,}" if doc.get("price") else "-"
-        print(f"      Name:   {doc['name']}")
-        print(f"      SKU:    {doc.get('sku', '-')}")
-        print(f"      Price:  {price_str} บาท")
-        print(f"      Stock:  {doc.get('stock', '-')} เครื่อง")
-        print(f"      Color:  {doc.get('color', '-')}")
-        print(f"      Model:  {doc.get('model', '-')}")
-        print(f"      Screen: {doc.get('screen_size', '-')} นิ้ว")
+    if doc.get("doc_id"):
+        print(f"      doc_id:   {doc['doc_id']}")
+        print(f"      Category: {doc.get('category', '-')}")
+        print(f"      Title:    {doc.get('title', '-')}")
+        image_ids = doc.get("image_ids", [])
+        if image_ids:
+            print(f"      Images:   {', '.join(image_ids)}")
+        text_preview = doc["text"][:200]
+        if len(doc["text"]) > 200:
+            text_preview += "..."
+        print(f"      Content:  {text_preview}")
     else:
         text_preview = doc["text"][:200]
         if len(doc["text"]) > 200:
@@ -499,7 +502,7 @@ def cmd_search(client: OpenAI, conn: sqlite3.Connection, query: str, top_k: int 
     """Hybrid search: run both vector (semantic) and substring (text-match) search, display both."""
     if not query:
         print("  Usage: search <query>  or  search <query> /N")
-        print("  Filters: --min-price N --max-price N --color X --model X --min-screen N --min-stock N")
+        print("  Filters: --category <category>")
         return
 
     # Parse filters from query
@@ -573,9 +576,9 @@ def cmd_list(conn: sqlite3.Connection) -> None:
 
     print(f"\n  Documents ({len(docs)} total):")
     for doc in docs:
-        if doc.get("name"):
-            price_str = f"{int(doc['price']):,}" if doc.get("price") else "-"
-            print(f"    [{doc['id']}] {doc['name']} | {doc.get('color','-')} | {price_str}฿ | stock:{doc.get('stock','-')}")
+        if doc.get("doc_id"):
+            images = ", ".join(doc.get("image_ids", [])) if doc.get("image_ids") else "-"
+            print(f"    [{doc['id']}] {doc['doc_id']} | {doc.get('category', '-')} | {doc.get('title', '-')[:40]} | img: {images}")
         else:
             date = doc["created_at"][:10]
             text_preview = doc["text"][:80]
@@ -588,12 +591,15 @@ def cmd_list(conn: sqlite3.Connection) -> None:
 def cmd_load(client: OpenAI, conn: sqlite3.Connection, filepath: str) -> None:
     """Load a file into the vector store.
 
-    For structured product files (pipe-delimited with header):
-      - Parses metadata columns for filtering
-      - Converts each row to natural language before embedding
+    For JSONL knowledge files:
+      - Parses category, title, content, image_ids
+      - Embeds title + content for semantic search
+
+    For JSON mapping files (e.g. image_mapping.txt):
+      - Converts entries to searchable documents
 
     For plain text files:
-      - One line = one document (original behavior)
+      - One line = one document
     """
     if not filepath:
         print("  Usage: load <filepath>")
@@ -610,50 +616,53 @@ def cmd_load(client: OpenAI, conn: sqlite3.Connection, filepath: str) -> None:
         print(f"  Error: Cannot read file: {e}")
         return
 
-    # Try parsing as structured product file
-    products = parse_product_file(path)
-    if products:
-        _load_products(client, conn, products, path.name)
+    # Try parsing as knowledge file (JSONL or JSON mapping)
+    records = parse_knowledge_file(path)
+    if records:
+        _load_knowledge(client, conn, records, path.name)
     else:
         _load_plain_text(client, conn, content, path.name)
 
 
-def _load_products(
-    client: OpenAI, conn: sqlite3.Connection, products: list[dict], filename: str
+def _load_knowledge(
+    client: OpenAI, conn: sqlite3.Connection, records: list[dict], filename: str
 ) -> None:
-    """Load structured product data: convert to natural language, embed, store with metadata."""
-    print(f"  Detected structured product file: {filename}")
-    print(f"  Found {len(products)} products to import")
-    print(f"  Converting rows to natural language for embedding...")
+    """Load knowledge base records: convert to NL, embed, store with metadata."""
+    print(f"  Detected knowledge file: {filename}")
+    print(f"  Found {len(records)} records to import")
 
-    # Convert all products to natural language
-    nl_texts = [row_to_natural_language(p) for p in products]
+    nl_texts = [row_to_natural_language(r) for r in records]
 
     # Show a sample
-    print(f"\n  Sample (row 1):")
-    print(f"    \"{nl_texts[0]}\"\n")
+    print(f"\n  Sample (record 1):")
+    print(f"    \"{nl_texts[0][:150]}...\"\n")
 
     # Batch embed
     BATCH_SIZE = 100
     stored = 0
     for i in range(0, len(nl_texts), BATCH_SIZE):
         batch_texts = nl_texts[i:i + BATCH_SIZE]
-        batch_meta = products[i:i + BATCH_SIZE]
+        batch_records = records[i:i + BATCH_SIZE]
         try:
             embeddings = get_embeddings_batch(client, batch_texts)
         except Exception as e:
             print(f"  Error at batch {i // BATCH_SIZE + 1}: {e}")
             break
 
-        for text, emb, meta in zip(batch_texts, embeddings, batch_meta):
-            store_document(conn, text, emb, metadata=meta)
+        for text, emb, record in zip(batch_texts, embeddings, batch_records):
+            store_document(conn, text, emb, metadata={
+                "doc_id": record.get("id"),
+                "category": record.get("category"),
+                "title": record.get("title"),
+                "image_ids": record.get("image_ids", []),
+            })
             stored += 1
 
-        print(f"  Imported {stored}/{len(products)}...")
+        print(f"  Imported {stored}/{len(records)}...")
 
-    print(f"  Done! {stored} products imported from {filename}")
-    print(f"  Metadata columns stored: name, sku, price, stock, color, model, screen_size")
-    print(f"  Use '--min-price', '--max-price', '--color', '--model' flags with search to filter")
+    print(f"  Done! {stored} records imported from {filename}")
+    print(f"  Metadata: doc_id, category, title, image_ids")
+    print(f"  Use '--category <name>' flag with search to filter")
 
 
 def _load_plain_text(
@@ -705,11 +714,12 @@ def show_help() -> None:
     print("""
   Commands:
     add <text>         Add a document to the store
-    load <filepath>    Import a file (auto-detects structured product vs plain text)
+    load <filepath>    Import a file (auto-detects JSONL knowledge vs plain text)
     search <query>     Hybrid search: semantic + substring (top 5)
     search <query> /N  Search with custom top-k (e.g. /3)
     list               List all stored documents
     count              Show document count
+    clear              Delete all documents
     help               Show this help message
     quit               Exit
 
@@ -720,18 +730,12 @@ def show_help() -> None:
     Results appearing in both sections are marked with ★
 
   Search Filters (append to search query):
-    --min-price 10000  Minimum price
-    --max-price 30000  Maximum price
-    --color ดำ          Filter by color (partial match)
-    --model Galaxy     Filter by model (partial match)
-    --min-screen 6.5   Minimum screen size
-    --max-screen 6.8   Maximum screen size
-    --min-stock 10     Minimum stock
+    --category recipe  Filter by category
 
   Example:
-    search มือถือจอใหญ่ --min-price 20000 --max-price 40000
-    search iPhone สีดำ --min-stock 10 /3
-    search IPH-16PM                        (substring finds exact SKU)
+    search ราคาผงเครื่องเทศ
+    search สูตรน้ำซุป --category recipe /3
+    search IMG_PROD_001
 """)
 
 
@@ -744,7 +748,7 @@ def show_banner(doc_count: int) -> None:
     db_display = DB_PATH.name
     print()
     print("  +==================================================+")
-    print("  |  Vector Search -- Semantic Search with FAISS      |")
+    print("  |  Knowledge Search -- Semantic Search with FAISS   |")
     print(f"  |  Model: {EMBEDDING_MODEL:<41s}|")
     print(f"  |  DB: {db_display:<44s}|")
     print(f"  |  Documents: {doc_count:<37d}|")
@@ -761,7 +765,7 @@ def show_banner(doc_count: int) -> None:
 def repl(client: OpenAI, conn: sqlite3.Connection) -> None:
     """Interactive REPL loop with autocomplete and history."""
     completer = WordCompleter(
-        ["add", "load", "search", "list", "count", "help", "quit", "exit"],
+        ["add", "load", "search", "list", "count", "clear", "help", "quit", "exit"],
         ignore_case=True,
     )
     session: PromptSession = PromptSession(
@@ -795,6 +799,8 @@ def repl(client: OpenAI, conn: sqlite3.Connection) -> None:
             cmd_count(conn)
         elif command == "list":
             cmd_list(conn)
+        elif command == "clear":
+            cmd_clear(conn)
         elif command == "add":
             cmd_add(client, conn, rest.strip())
         elif command == "load":

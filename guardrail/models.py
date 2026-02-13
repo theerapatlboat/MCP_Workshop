@@ -32,3 +32,6 @@ class GuardResponse(BaseModel):
     vector_check: GuardCheckResult | None = None
     llm_check: GuardCheckResult | None = None
     memory_count: int = 0
+    image_ids: list[str] = Field(
+        default_factory=list, description="Image IDs from agent to send as attachments"
+    )
