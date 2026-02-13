@@ -6,3 +6,4 @@ guardrail/logs/
 agent/vector_store.db
 agent/sessions.db
 mcp-server/mem0_data/
+webhook/fb_attachment_ids.json
