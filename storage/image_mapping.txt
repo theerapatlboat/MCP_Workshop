@@ -1,0 +1,82 @@
+{
+  "IMG_PROD_001": {
+    "file": "IMG_PROD_001.jpg",
+    "original": "30 กรัม-01.jpg",
+    "description": "สินค้าครบ 3 แบบ (ผงเครื่องเทศน้ำข้น, น้ำใส, ผงสามเกลอ) ขนาด 30 กรัม"
+  },
+  "IMG_PROD_002": {
+    "file": "IMG_PROD_002.jpg",
+    "original": "รูป TIKTOK 2_TIKOK น้ำข้น.jpg",
+    "description": "ซองเดี่ยว ผงเครื่องเทศสูตรน้ำข้น"
+  },
+  "IMG_PROD_003": {
+    "file": "IMG_PROD_003.jpg",
+    "original": "รูป TIKTOK 2_TIKTOK น้ำใส.jpg",
+    "description": "ซองเดี่ยว ผงเครื่องเทศสูตรน้ำใส"
+  },
+  "IMG_PROD_004": {
+    "file": "IMG_PROD_004.jpg",
+    "original": "รูป TIKTOK 2_สามเกลอ 30 กรัม.jpg",
+    "description": "ผงสามเกลอ ขนาด 30 กรัม"
+  },
+  "IMG_PROD_005": {
+    "file": "IMG_PROD_005.jpg",
+    "original": "รูป TIKTOK 2_สามเกลอ 5 กรัม.jpg",
+    "description": "ผงสามเกลอ ขนาด 5 กรัม"
+  },
+  "IMG_REVIEW_001": {
+    "file": "IMG_REVIEW_001.jpg",
+    "original": "ads รีวิวจากแม่ค้า 3-05.jpg",
+    "description": "รีวิวจากเจ้าของร้าน ยอดขายเพิ่มขึ้น 2 เท่า ซองละ 59 บาท"
+  },
+  "IMG_REVIEW_002": {
+    "file": "IMG_REVIEW_002.jpg",
+    "original": "ads รีวิวจากแม่ค้า 4-05.jpg",
+    "description": "รีวิว 70,000 ร้านเลือกใช้ สูตรลับกลิ่นหอม"
+  },
+  "IMG_REVIEW_003": {
+    "file": "IMG_REVIEW_003.jpg",
+    "original": "ads รีวิวจากแม่ค้า 5-01.jpg",
+    "description": "รีวิว ร้านก๋วยเตี๋ยวมั่นใจ หอมเลย บางคนตัดมากินทุกวัน"
+  },
+  "IMG_REVIEW_004": {
+    "file": "IMG_REVIEW_004.jpg",
+    "original": "ads รีวิวจากแม่ค้า 6-01.jpg",
+    "description": "รีวิว ลูกค้าติดใจ ร้านก๋วยเตี๋ยวคอนเฟิร์ม หอม X3"
+  },
+  "IMG_REVIEW_005": {
+    "file": "IMG_REVIEW_005.jpg",
+    "original": "ads รีวิวจากแม่ค้า 8-01.jpg",
+    "description": "รีวิวพ่อค้าก๋วยเตี๋ยว หอมทะลุซองคอนเฟิร์ม 80,000 ร้าน"
+  },
+  "IMG_REVIEW_006": {
+    "file": "IMG_REVIEW_006.jpg",
+    "original": "ads รีวิวจากแม่ค้า 9-01.jpg",
+    "description": "รีวิว ร้านก๋วยเตี๋ยวทั่วไทยมั่นใจใช้ผงรักกัน 80,000 ร้าน"
+  },
+  "IMG_CERT_001": {
+    "file": "IMG_CERT_001.jpg",
+    "original": "ได้ฮาลาลแล้ว-07.jpg",
+    "description": "ใบรับรองฮาลาล อิสลามทานได้ กอท.สต. T888/2567"
+  },
+  "IMG_RECIPE_001": {
+    "file": "IMG_RECIPE_001.jpg",
+    "original": "คู่มือ การเปิดร้านก๋วยเตี๋ยว ครึ่งหลัง-01.jpg",
+    "description": "คู่มือการทำน้ำซุปใส พร้อมวัตถุดิบและขั้นตอน"
+  },
+  "IMG_RECIPE_002": {
+    "file": "IMG_RECIPE_002.jpg",
+    "original": "คู่มือ การเปิดร้านก๋วยเตี๋ยว ครึ่งหลัง-02.jpg",
+    "description": "คู่มือการทำน้ำซุปข้น พร้อมวัตถุดิบและขั้นตอน"
+  },
+  "IMG_MARKETING_001": {
+    "file": "IMG_MARKETING_001.jpg",
+    "original": "รูปตอบแชท2_ช่องทางการจำหน่าย copy.jpg",
+    "description": "โชว์สินค้าทั้ง 2 สูตร ปรุงปกติ สูตรไม่เปลี่ยน หอมอย่างเดียว"
+  },
+  "IMG_MARKETING_002": {
+    "file": "IMG_MARKETING_002.jpg",
+    "original": "วิธีการทำ โบรชัวร์-02.jpg",
+    "description": "อินโฟกราฟิกวิธีการใช้ อัตราส่วนทำกินและทำขาย"
+  }
+}
