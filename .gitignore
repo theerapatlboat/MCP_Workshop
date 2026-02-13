@@ -2,6 +2,7 @@
 **/__pycache__/
 .mcp.json
 webhook/logs/
+guardrail/logs/
 agent/vector_store.db
 agent/sessions.db
 mcp-server/mem0_data/

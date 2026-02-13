@@ -43,7 +43,8 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:textual.textualize.io)",
       "WebFetch(domain:realpython.com)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(sqlite3:*)"
     ]
   }
 }
